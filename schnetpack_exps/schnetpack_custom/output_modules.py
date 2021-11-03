@@ -187,3 +187,156 @@ class CustomAtomwise(nn.Module):
 
         return result
 
+
+class TwoNetsAtomwise(nn.Module):
+    """
+    Predicts atom-wise contributions and accumulates global prediction, e.g. for the
+    energy.
+    The atomic fatures are first processed by the "anet", then aggregated to a
+    molecular feature vector, and finally processed by the "mnet".
+    The default corresponds to the orignal SchNet Atomwise output module, i.e.,
+    anet with 2 layers and mnet with 0 layers.
+
+    Args:
+        n_in (int): input dimension of representation
+        n_intermediate (int): intermediate dimension, at aggregation (default: n_out)
+        n_out (int): output dimension of target property (default: len(properties))
+        aggregation_mode (str): one of {sum, avg} (default: sum)
+        anet_layers (int): number of nn in output network (default: 2)
+        anet_neurons (list of int or None): number of neurons in each layer of the output
+            network. If `None`, divide neurons by 2 in each layer. (default: None)
+        activation (function): activation function for hidden nn
+            (default: spk.nn.activations.shifted_softplus)
+        properties (list(str)): names of the output properties (default: ["y"])
+        contributions (str or None): Name of property contributions in return dict.
+            No contributions returned if None. (default: None)
+        means (torch.Tensor or None): means of properties
+        stddevs (torch.Tensor or None): standard deviations of properties (default: None)
+        atomref (torch.Tensor or None): reference single-atom properties. Expects
+            an (max_z + 1) x 1 array where atomref[Z] corresponds to the reference
+            property of element Z. The value of atomref[0] must be zero, as this
+            corresponds to the reference property for for "mask" atoms. (default: None)
+        anet (callable): Network used for atomistic outputs. Takes schnetpack input
+            dictionary as input. Output is not normalized. If set to None,
+            a pyramidal network is generated automatically. (default: None)
+
+    Returns:
+        tuple: prediction for property
+
+        If contributions is not None additionally returns atom-wise contributions.
+
+        If derivative is not None additionally returns derivative w.r.t. atom positions.
+
+    """
+
+    def __init__(
+        self,
+        n_in,
+        n_intermediate=None,
+        n_out=None,
+        aggregation_mode="avg",
+        a_net_layers=2,
+        a_net_neurons=None,
+        m_net_layers=0,
+        m_net_neurons=None,
+        activation=schnetpack.nn.activations.shifted_softplus,
+        properties=["y"],
+        contributions=None,
+        means=None,
+        stddevs=None,
+        atomref=None,
+        a_net=None,
+        m_net=None,
+    ):
+        super(TwoNetsAtomwise, self).__init__()
+
+        self.derivative = None
+        self.stress = None
+        self.properties = properties
+        self.contributions = contributions
+
+        if n_out is None:
+            n_out = len(properties)
+
+        if n_intermediate is None:
+            n_intermediate = n_out
+
+        if means is None:
+            means = torch.FloatTensor([0.0] * n_out)
+        if stddevs is None:
+            stddevs = torch.FloatTensor([1.0] * n_out)
+
+        # initialize single atom energies
+        if atomref is not None:
+            self.atomref = nn.Embedding.from_pretrained(
+                torch.from_numpy(atomref.astype(np.float32))
+            )
+        else:
+            self.atomref = None
+
+        # build the atomic-features network
+        if a_net is None:
+            self.a_net = nn.Sequential(
+                schnetpack.nn.base.GetItem("representation"),
+                schnetpack.nn.blocks.MLP(n_in, n_intermediate, a_net_neurons, a_net_layers, activation),
+            )
+        else:
+            self.a_net = a_net
+
+        # build aggregation layer
+        if aggregation_mode == "sum":
+            self.atom_pool = schnetpack.nn.base.Aggregate(axis=1, mean=False)
+        elif aggregation_mode == "avg":
+            self.atom_pool = schnetpack.nn.base.Aggregate(axis=1, mean=True)
+        elif aggregation_mode == "max":
+            self.atom_pool = schnetpack.nn.base.MaxAggregate(axis=1)
+        elif aggregation_mode == "softmax":
+            self.atom_pool = schnetpack.nn.base.SoftmaxAggregate(axis=1)
+        else:
+            raise AtomwiseError(
+                "{} is not a valid aggregation " "mode!".format(aggregation_mode)
+            )
+
+        # build the molecular-features network
+        if m_net is None:
+            if (m_net_neurons and len(m_net_neurons)==0) or m_net_layers==0:
+                self.m_net = torch.nn.Identity()
+            else:
+                self.m_net = schnetpack.nn.blocks.MLP(
+                    n_intermediate, n_out, m_net_neurons, m_net_layers, activation)
+        else:
+            self.m_net = m_net
+
+        # build standardization layer
+        self.standardize = schnetpack.nn.base.ScaleShift(means, stddevs)
+
+
+    def forward(self, inputs):
+        r"""
+        predicts atomwise property
+        """
+        atomic_numbers = inputs[Properties.Z]
+        atom_mask = inputs[Properties.atom_mask]
+
+        # run prediction
+        yi = self.a_net(inputs)
+
+        y = self.atom_pool(yi, atom_mask)
+
+        y = self.m_net(y)
+
+        y = self.standardize(y)
+
+        if self.atomref is not None:
+            y0 = self.atomref(atomic_numbers)
+            y = y + self.atom_pool(y0, atom_mask)
+
+
+        # collect results
+        result = {prop: y[:, i:i+1] for i, prop in enumerate(self.properties)}
+
+        if self.contributions is not None:
+            result[self.contributions] = yi
+
+
+        return result

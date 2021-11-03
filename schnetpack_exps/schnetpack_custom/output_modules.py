@@ -14,21 +14,21 @@ import schnetpack
 from schnetpack.atomistic.output_modules import AtomwiseError
 from schnetpack import Properties
 
-class Atomwise(nn.Module):
+class CustomAtomwise(nn.Module):
     """
     Predicts atom-wise contributions and accumulates global prediction, e.g. for the
     energy.
 
     Args:
         n_in (int): input dimension of representation
-        n_out (int): output dimension of target property (default: 1)
+        n_out (int): output dimension of target property (default: len(properties))
         aggregation_mode (str): one of {sum, avg} (default: sum)
         n_layers (int): number of nn in output network (default: 2)
         n_neurons (list of int or None): number of neurons in each layer of the output
             network. If `None`, divide neurons by 2 in each layer. (default: None)
         activation (function): activation function for hidden nn
             (default: spk.nn.activations.shifted_softplus)
-        property (str): name of the output property (default: "y")
+        properties (list(str)): names of the output properties (default: ["y"])
         contributions (str or None): Name of property contributions in return dict.
             No contributions returned if None. (default: None)
         derivative (str or None): Name of property derivative. No derivative
@@ -40,8 +40,8 @@ class Atomwise(nn.Module):
             freed. Note that in nearly all cases setting this option to True is not
             needed and often can be worked around in a much more efficient way.
             Defaults to the value of create_graph. (default: False)
-        mean (torch.Tensor or None): mean of property
-        stddev (torch.Tensor or None): standard deviation of property (default: None)
+        means (torch.Tensor or None): means of properties
+        stddevs (torch.Tensor or None): standard deviations of properties (default: None)
         atomref (torch.Tensor or None): reference single-atom properties. Expects
             an (max_z + 1) x 1 array where atomref[Z] corresponds to the reference
             property of element Z. The value of atomref[0] must be zero, as this
@@ -62,34 +62,39 @@ class Atomwise(nn.Module):
     def __init__(
         self,
         n_in,
-        n_out=1,
+        n_out=None,
         aggregation_mode="sum",
         n_layers=2,
         n_neurons=None,
         activation=schnetpack.nn.activations.shifted_softplus,
-        property="y",
+        properties=["y"],
         contributions=None,
         derivative=None,
         negative_dr=False,
         stress=None,
         create_graph=False,
-        mean=None,
-        stddev=None,
+        means=None,
+        stddevs=None,
         atomref=None,
         outnet=None,
     ):
-        super(Atomwise, self).__init__()
+        super(CustomAtomwise, self).__init__()
 
         self.n_layers = n_layers
         self.create_graph = create_graph
-        self.property = property
+        self.properties = properties
         self.contributions = contributions
         self.derivative = derivative
         self.negative_dr = negative_dr
         self.stress = stress
 
-        mean = torch.FloatTensor([0.0]) if mean is None else mean
-        stddev = torch.FloatTensor([1.0]) if stddev is None else stddev
+        if n_out is None:
+            n_out = len(properties)
+
+        if means is None:
+            means = torch.FloatTensor([0.0] * n_out)
+        if stddevs is None:
+            stddevs = torch.FloatTensor([1.0] * n_out)
 
         # initialize single atom energies
         if atomref is not None:
@@ -109,7 +114,7 @@ class Atomwise(nn.Module):
             self.out_net = outnet
 
         # build standardization layer
-        self.standardize = schnetpack.nn.base.ScaleShift(mean, stddev)
+        self.standardize = schnetpack.nn.base.ScaleShift(means, stddevs)
 
         # build aggregation layer
         if aggregation_mode == "sum":
@@ -143,7 +148,7 @@ class Atomwise(nn.Module):
         y = self.atom_pool(yi, atom_mask)
 
         # collect results
-        result = {self.property: y}
+        result = {prop: y[:, i] for i, prop in enumerate(self.properties)}
 
         if self.contributions is not None:
             result[self.contributions] = yi

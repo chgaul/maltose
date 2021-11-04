@@ -192,19 +192,28 @@ class TwoNetsAtomwise(nn.Module):
     """
     Predicts atom-wise contributions and accumulates global prediction, e.g. for the
     energy.
-    The atomic fatures are first processed by the "anet", then aggregated to a
+    The atomic fatures are first processed by the "a_net", then aggregated to a
     molecular feature vector, and finally processed by the "mnet".
     The default corresponds to the orignal SchNet Atomwise output module, i.e.,
     anet with 2 layers and mnet with 0 layers.
 
+    Note that the standardize operation takes place after the second MLP,
+    i.e., after aggregation, not before aggregation as in the schnetpack
+    Atomwise output module. This means, the means and stds provided in the
+    constructor should be computed with divide_by_atoms=False.
+
     Args:
         n_in (int): input dimension of representation
         n_intermediate (int): intermediate dimension, at aggregation (default: n_out)
-        n_out (int): output dimension of target property (default: len(properties))
         aggregation_mode (str): one of {sum, avg} (default: sum)
-        anet_layers (int): number of nn in output network (default: 2)
-        anet_neurons (list of int or None): number of neurons in each layer of the output
-            network. If `None`, divide neurons by 2 in each layer. (default: None)
+        a_net_layers (int): number of nn in the 1st output network (default: 2)
+        a_net_neurons (list of int or None): number of neurons in each layer of
+            the 1st output network. If `None`, divide neurons by 2 in each
+            layer. (default: None)
+        m_net_layers (int): number of nn in the 2nd output network (default: 1)
+        m_net_neurons (list of int or None): number of neurons in each layer of
+            the 2nd output network. If `None`, divide neurons by 2 in each
+            layer. (default: None)
         activation (function): activation function for hidden nn
             (default: spk.nn.activations.shifted_softplus)
         properties (list(str)): names of the output properties (default: ["y"])
@@ -216,8 +225,11 @@ class TwoNetsAtomwise(nn.Module):
             an (max_z + 1) x 1 array where atomref[Z] corresponds to the reference
             property of element Z. The value of atomref[0] must be zero, as this
             corresponds to the reference property for for "mask" atoms. (default: None)
-        anet (callable): Network used for atomistic outputs. Takes schnetpack input
-            dictionary as input. Output is not normalized. If set to None,
+        a_net (callable): Network used for atomistic outputs. Takes schnetpack
+            input dictionary as input. Output is not normalized. If set to None,
+            a pyramidal network is generated automatically. (default: None)
+        m_net (callable): Network used for molecular outputs. Takes schnetpack
+            input dictionary as input. Output is not normalized. If set to None,
             a pyramidal network is generated automatically. (default: None)
 
     Returns:
@@ -233,11 +245,10 @@ class TwoNetsAtomwise(nn.Module):
         self,
         n_in,
         n_intermediate=None,
-        n_out=None,
         aggregation_mode="avg",
         a_net_layers=2,
         a_net_neurons=None,
-        m_net_layers=0,
+        m_net_layers=1,
         m_net_neurons=None,
         activation=schnetpack.nn.activations.shifted_softplus,
         properties=["y"],
@@ -250,13 +261,21 @@ class TwoNetsAtomwise(nn.Module):
     ):
         super(TwoNetsAtomwise, self).__init__()
 
+        if a_net_neurons is not None:
+            if not isinstance(a_net_neurons, int):
+                assert len(a_net_neurons) == a_net_layers - 1,\
+                    "parameter a_net_neurons: bad length"
+        if m_net_neurons is not None:
+            if not isinstance(m_net_neurons, int):
+                assert len(m_net_neurons) == m_net_layers - 1,\
+                    "parameter m_net_neurons: bad length"
+
         self.derivative = None
         self.stress = None
         self.properties = properties
         self.contributions = contributions
 
-        if n_out is None:
-            n_out = len(properties)
+        n_out = len(properties)
 
         if n_intermediate is None:
             n_intermediate = n_out
@@ -266,6 +285,9 @@ class TwoNetsAtomwise(nn.Module):
         if stddevs is None:
             stddevs = torch.FloatTensor([1.0] * n_out)
 
+        # build standardization layer
+        self.standardize = schnetpack.nn.base.ScaleShift(means, stddevs)
+
         # initialize single atom energies
         if atomref is not None:
             self.atomref = nn.Embedding.from_pretrained(
@@ -274,14 +296,18 @@ class TwoNetsAtomwise(nn.Module):
         else:
             self.atomref = None
 
-        # build the atomic-features network
-        if a_net is None:
-            self.a_net = nn.Sequential(
-                schnetpack.nn.base.GetItem("representation"),
-                schnetpack.nn.blocks.MLP(n_in, n_intermediate, a_net_neurons, a_net_layers, activation),
-            )
+        # build the molecular-features network
+        self.empty_m_net = False
+        if m_net is None:
+            if m_net_layers==0:
+                self.empty_m_net = True
+                assert n_intermediate == n_out
+            else:
+                self.m_net = schnetpack.nn.blocks.MLP(
+                    n_intermediate, n_out, m_net_neurons, m_net_layers,
+                    activation)
         else:
-            self.a_net = a_net
+            self.m_net = m_net
 
         # build aggregation layer
         if aggregation_mode == "sum":
@@ -297,18 +323,17 @@ class TwoNetsAtomwise(nn.Module):
                 "{} is not a valid aggregation " "mode!".format(aggregation_mode)
             )
 
-        # build the molecular-features network
-        if m_net is None:
-            if (m_net_neurons and len(m_net_neurons)==0) or m_net_layers==0:
-                self.m_net = torch.nn.Identity()
-            else:
-                self.m_net = schnetpack.nn.blocks.MLP(
-                    n_intermediate, n_out, m_net_neurons, m_net_layers, activation)
+        # build the atomic-features network
+        if a_net is None:
+            self.a_net = nn.Sequential(
+                schnetpack.nn.base.GetItem("representation"),
+                schnetpack.nn.blocks.MLP(
+                        n_in, n_intermediate, a_net_neurons, a_net_layers,
+                        activation))
+            if not self.empty_m_net:
+                self.a_net[1].out_net[-1].activation = activation
         else:
-            self.m_net = m_net
-
-        # build standardization layer
-        self.standardize = schnetpack.nn.base.ScaleShift(means, stddevs)
+            self.a_net = a_net
 
 
     def forward(self, inputs):
@@ -323,7 +348,8 @@ class TwoNetsAtomwise(nn.Module):
 
         y = self.atom_pool(yi, atom_mask)
 
-        y = self.m_net(y)
+        if not self.empty_m_net:
+            y = self.m_net(y)
 
         y = self.standardize(y)
 

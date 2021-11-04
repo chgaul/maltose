@@ -148,7 +148,7 @@ class CustomAtomwise(nn.Module):
         y = self.atom_pool(yi, atom_mask)
 
         # collect results
-        result = {prop: y[:, i] for i, prop in enumerate(self.properties)}
+        result = {prop: y[:, i:i+1] for i, prop in enumerate(self.properties)}
 
         if self.contributions is not None:
             result[self.contributions] = yi

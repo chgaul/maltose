@@ -14,6 +14,9 @@ import schnetpack
 from schnetpack.atomistic.output_modules import AtomwiseError
 from schnetpack import Properties
 
+from torch_scatter import scatter_add
+from torch_geometric.utils import softmax
+
 class CustomAtomwise(nn.Module):
     """
     Predicts atom-wise contributions and accumulates global prediction, e.g. for the
@@ -364,5 +367,115 @@ class TwoNetsAtomwise(nn.Module):
         if self.contributions is not None:
             result[self.contributions] = yi
 
+
+        return result
+
+class Set2Set(nn.Module):
+    """
+    Adapted from torch_geometric.nn.glob.set2set for schnetpack
+
+    Args:
+        n_in (int): input dimension of representation
+        processing_steps (int): Number of iterations :math:`T`.
+        num_layers (int, optional): Number of recurrent layers, *.e.g*, setting
+            :obj:`num_layers=2` would mean stacking two LSTMs together to form
+            a stacked LSTM, with the second LSTM taking in outputs of the first
+            LSTM and computing the final results. (default: :obj:`1`)
+        means (torch.Tensor or None): means of properties
+        stddevs (torch.Tensor or None): standard deviations of properties (default: None)
+    """
+    def __init__(
+        self,
+        n_in,
+        processing_steps,
+        num_layers=1,
+        m_net_layers=1,
+        m_net_neurons=None,
+        activation=schnetpack.nn.activations.shifted_softplus,
+        properties=["y"],
+        m_net=None,
+        means=None,
+        stddevs=None):
+
+        super(Set2Set, self).__init__()
+        self.derivative = None
+        self.stress = None
+        self.properties = properties
+
+        self.n_in = n_in
+        n_set2set_out = 2 * n_in
+        self.processing_steps = processing_steps
+        self.num_layers = num_layers
+
+        self.input = nn.Sequential(
+            schnetpack.nn.base.GetItem("representation"))
+
+        self.lstm = torch.nn.LSTM(
+                input_size=n_set2set_out,
+                hidden_size=self.n_in,
+                num_layers=num_layers)
+
+        n_out = len(properties)
+        if m_net is None:
+            assert m_net_layers > 0, "Cannot get to the required output dimension!"
+            self.m_net = schnetpack.nn.blocks.MLP(
+                n_set2set_out, n_out, m_net_neurons, m_net_layers,
+                activation)
+        else:
+            self.m_net = m_net
+
+        self.standardize = schnetpack.nn.base.ScaleShift(means, stddevs)
+
+    def forward(self, inputs):
+        r"""
+        predicts atomwise property
+        """
+        atom_mask = inputs[Properties.atom_mask]
+        batch_size = atom_mask.shape[0] # batch_size = N_mols
+        y = self.input(inputs)
+        # y.shape = (batch_size, max(n_atoms), n_in),
+
+        # The following code is adapted from torch_geometric.nn.glob.set2set.
+        # First, adapt the input format: instead of the schnetpack _atoms_mask,
+        # provide a 'batch' tensor, holding for each atom the index of the
+        # molecule it belongs to.
+        m = inputs['_atom_mask'].to(bool)
+        # create the batch tensor, which holds the molecule index for each atom:
+        batch = torch.Tensor(
+            [i for i, mask in enumerate(m) for valid in mask if valid]).to(int)
+        x = y[m]
+        # x.shape = (sum(n_atoms), n_in) =: (N_atoms, n_in)
+
+        # Input sequence to the lstm:
+        q_star = y.new_zeros(batch_size, 2 * self.n_in)
+        # Initial hidden state and cell state for each element of the batch:
+        h = (y.new_zeros((self.num_layers, batch_size, self.n_in)),
+             y.new_zeros((self.num_layers, batch_size, self.n_in)))
+        # The following loop processes q_star and h, as a function of x:
+        for i in range(self.processing_steps):
+            q, h = self.lstm(q_star.unsqueeze(0), h)
+            # q, h are output sequence and hidden states. Note that LSTM(n_)
+            # q.shape = (1, N_mols, n_in)
+            q = q.view(batch_size, self.n_in) # q.shape = (N_mols, n_in)
+            # Use q for a per-molecule weighted sum of atom features from x
+            # 1. dot product of the x_i with their respective q_b[i]:
+            e = (x * q[batch]).sum(dim=-1, keepdim=True)
+            #    e.shape = (N_atoms, 1)
+            # 2. molecule-wise softmax (for normalization):
+            a = softmax(e, batch, num_nodes=batch_size)
+            #    a.shape = (N_atoms, 1)
+            # 3. molecule-wise weighted sum:
+            r = scatter_add(a * x, batch, dim=0, dim_size=batch_size)
+            #    r.shape = (N_mols, n_in)
+            # Finally, concatenate r (weigted sum of x's) to q, and continue:
+            q_star = torch.cat([q, r], dim=-1)
+            # q_star.shape = (N_mols, 2*n_in)
+
+        # Apply the molecule-level network to reduce the dimension from
+        # from 2*n_in to len(properties):
+        y = self.m_net(q_star)
+        y = self.standardize(y)
+        # collect results
+        result = {prop: y[:, i:i+1] for i, prop in enumerate(self.properties)}
 
         return result

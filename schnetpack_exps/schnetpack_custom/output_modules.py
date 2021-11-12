@@ -442,7 +442,9 @@ class Set2Set(nn.Module):
         m = inputs['_atom_mask'].to(bool)
         # create the batch tensor, which holds the molecule index for each atom:
         batch = torch.Tensor(
-            [i for i, mask in enumerate(m) for valid in mask if valid]).to(int)
+            [i for i, mask in enumerate(m) for valid in mask if valid]).to(
+                    dtype=int,
+                    device=y.device)
         x = y[m]
         # x.shape = (sum(n_atoms), n_in) =: (N_atoms, n_in)
 

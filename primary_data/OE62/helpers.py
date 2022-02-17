@@ -131,8 +131,7 @@ def xyz2ase(xyz_str):
     Convert a xyz file to an ASE atoms object via in-memory file (StringIO).
     """
     
-    xyzfile = io.StringIO()
-    xyzfile.write(xyz_str)
+    xyzfile = io.StringIO(xyz_str)
     mol = ase.io.read(xyzfile, format="xyz")
     
     return mol

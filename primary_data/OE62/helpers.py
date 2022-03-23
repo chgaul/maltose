@@ -100,7 +100,7 @@ def get_level(row, level_type='HOMO', subset='PBE+vdW_vacuum'):
             else: energy_mo = None
         else:
             energy_mo = None
-            print("err", row.refcode_csd)
+            print("err ({})".format(level_type), row.refcode_csd)
 
 
         
@@ -112,14 +112,14 @@ def get_level(row, level_type='HOMO', subset='PBE+vdW_vacuum'):
         
         if subset in subsets: field = row[fields_unoccupied[subsets.index(subset)]]
         else: field = row[fiels_unoccupied[0]]
-            
+        if isinstance(field, float):
+            field = [field]
         if isinstance(field, list):
             if len(field) > level: energy_mo = float(field[level])
             else: energy_mo = None
-
         else: 
             energy_mo = None
-            print("err", row.refcode_csd)
+            print("err ({})".format(level_type), row.refcode_csd)
         
         
     return energy_mo

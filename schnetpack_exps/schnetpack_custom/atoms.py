@@ -42,10 +42,10 @@ class MultitaskAtomsData(AtomsData):
             inner_k = self.tasksmap[k]
             if inner_k is not None:
                 valid = np.array([1.0])
-                outer_props[k] = np.concatenate([valid, inner_props[inner_k]])
+                outer_props[k] = np.stack([valid, inner_props[inner_k]])
             else:
                 invalid, dummy = 0.0, -1.0
-                outer_props[k] = np.array([invalid, dummy])
+                outer_props[k] = np.array([[invalid], [dummy]])
 
         return at, outer_props
 

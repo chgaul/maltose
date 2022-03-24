@@ -11,14 +11,18 @@ class MultitaskAtomsData(AtomsData):
     def __init__(
             self,
             atomsdata: Union[AtomsData, AtomsDataSubset, ConcatAtomsData],
-            tasksmapping: List[Tuple[str, Optional[str]]]):
+            tasksmapping: List[Tuple[str, Optional[str]]],
+            validity_column=True):
         self.atomsdata = atomsdata
         self._available_properties = [outer_k for outer_k, _ in tasksmapping]
         self.tasksmap = {outer_k: inner_k for outer_k, inner_k in tasksmapping}
-        for inner_k in self.tasksmap.values():
-            if inner_k is not None:
-                assert inner_k in self.atomsdata.available_properties
         self._load_only = None
+        self.validity_column = validity_column
+        for inner_k in self.tasksmap.values():
+            if inner_k is None:
+                assert self.validity_column
+            else:
+                assert inner_k in self.atomsdata.available_properties
         
     def get_properties(self, idx, load_only=None):
         
@@ -40,12 +44,15 @@ class MultitaskAtomsData(AtomsData):
         # Add the "outer" properties
         for k in requested_props:
             inner_k = self.tasksmap[k]
-            if inner_k is not None:
-                valid = np.array([1.0])
-                outer_props[k] = np.stack([valid, inner_props[inner_k]])
+            if self.validity_column:
+                if inner_k is not None:
+                    valid = np.array([1.0])
+                    outer_props[k] = np.stack([valid, inner_props[inner_k]])
+                else:
+                    invalid, dummy = 0.0, -1.0
+                    outer_props[k] = np.array([[invalid], [dummy]])
             else:
-                invalid, dummy = 0.0, -1.0
-                outer_props[k] = np.array([[invalid], [dummy]])
+                outer_props[k] = inner_props[inner_k]
 
         return at, outer_props
 

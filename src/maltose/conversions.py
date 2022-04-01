@@ -1,9 +1,3 @@
-#!/usr/bin/env python
-# coding: utf-8
-
-# In[8]:
-
-
 import ase.io
 import xyz2mol
 import rdkit
@@ -13,14 +7,17 @@ from rdkit.Chem.rdmolfiles import MolToXYZFile
 import tempfile
 import os.path
 
-def xyz2rdkit(src_file: str):
+def xyz2rdkit(
+        src_file: str,
+        allow_charged_fragments=True,
+        use_huckel=False):
     atoms, charge, xyz_coordinates = xyz2mol.read_xyz_file(src_file)
     mols = xyz2mol.xyz2mol(atoms, xyz_coordinates,
         charge=charge,
         use_graph=True,
-        allow_charged_fragments=True,
+        allow_charged_fragments=allow_charged_fragments,
         embed_chiral=True,
-        use_huckel=False)
+        use_huckel=use_huckel)
     assert len(mols) == 1
     return mols[0]
 

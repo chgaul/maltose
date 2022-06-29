@@ -36,7 +36,19 @@ def recover_geometry(mol_in: rdkit.Chem.rdchem.Mol) -> rdkit.Chem.rdchem.Mol:
     AllChem.EmbedMolecule(mol, clearConfs=True, randomSeed=42)
     assert len(mol.GetConformers()) == 1
     return mol
-    
+
+def ase2rdkit(atoms: ase.atoms.Atoms) -> rdkit.Chem.rdchem.Mol:
+    tmpdir = tempfile.TemporaryDirectory()
+    xyzfile = os.path.join(tmpdir.name, 'test.xyz')
+    ase.io.write(xyzfile, atoms)
+    return xyz2rdkit(xyzfile)
+
+def rdkit2ase(mol: rdkit.Chem.rdchem.Mol) -> ase.atoms.Atoms:
+    tmpdir = tempfile.TemporaryDirectory()
+    xyzfile = os.path.join(tmpdir.name, "file.xyz")
+    MolToXYZFile(mol, xyzfile)
+    return ase.io.read(xyzfile)
+
 """
 squeeze a molecule trough the SMILES bottleneck
 
@@ -45,17 +57,8 @@ squeeze a molecule trough the SMILES bottleneck
 3. transform back to ase.atoms.Atoms
 """
 def squeeze(atoms: ase.atoms.Atoms) -> ase.atoms.Atoms:
-    tmpdir = tempfile.TemporaryDirectory()
-    xyzfile = os.path.join(tmpdir.name, 'test.xyz')
-    ase.io.write(xyzfile, atoms)
-    mol_orig = xyz2rdkit(xyzfile)
-    
+    mol_orig = ase2rdkit(atoms)
     smiles = rdkit2smiles(mol_orig)
     mol = Chem.MolFromSmiles(smiles)
-    
     mol_restored = recover_geometry(mol)
-    xyzfile2 = os.path.join(tmpdir.name, "file_modified.xyz")
-
-    MolToXYZFile(mol_restored, xyzfile2)
-    return ase.io.read(xyzfile2)
-
+    return rdkit2ase(mol_restored)

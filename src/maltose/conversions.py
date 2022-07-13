@@ -50,7 +50,7 @@ def rdkit2ase(mol: rdkit.Chem.rdchem.Mol) -> ase.atoms.Atoms:
     return ase.io.read(xyzfile)
 
 """
-squeeze a molecule trough the SMILES bottleneck
+squeeze a molecule through the SMILES bottleneck
 
 1. transform an instance of ase.atoms.Atoms to SMILES
 2. generate a new 3D geometry in rdkit

@@ -39,8 +39,8 @@ def recover_geometry(mol_in: rdkit.Chem.rdchem.Mol) -> rdkit.Chem.rdchem.Mol:
 
 def ase2rdkit(atoms: ase.atoms.Atoms) -> rdkit.Chem.rdchem.Mol:
     tmpdir = tempfile.TemporaryDirectory()
-    xyzfile = os.path.join(tmpdir.name, 'test.xyz')
-    ase.io.write(xyzfile, atoms)
+    xyzfile = os.path.join(tmpdir.name, 'file.xyz')
+    ase.io.write(xyzfile, atoms, format='xyz')
     return xyz2rdkit(xyzfile)
 
 def rdkit2ase(mol: rdkit.Chem.rdchem.Mol) -> ase.atoms.Atoms:

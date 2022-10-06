@@ -3,7 +3,7 @@ from schnetpack.train import Metric
 class MultitaskMetricWrapper(Metric):
     """
     This class expects batches with the columns validity and value.
-    Unly the valid network estimats and target values are passed to the wrapped
+    Only the valid network estimats and target values are passed to the wrapped
     metric.
     """
     def __init__(self, metric: Metric):

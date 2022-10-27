@@ -1,67 +1,57 @@
-#!/usr/bin/env python
-# coding: utf-8
+"""
+Download and prepare the data from the Alchemy contest.
 
-# In[ ]:
-
-
-import os.path
+Prepare an ase database suitable for training a model with schnetpack. Save the
+attributes 'homo', 'lumo', and 'gap'.
+"""
+import os
+import urllib.request
+import zipfile
 import csv
 import json
 import numpy as np
 import ase.io
 from schnetpack import AtomsData
+import rdkit.Chem
 
 
-# In[ ]:
+scratch_dir = os.path.join('scratch', 'Alchemy')
 
+zip_path = os.path.join(scratch_dir, 'alchemy-v20191129.zip')
+if not os.path.exists(zip_path):
+    zip_url = 'https://alchemy.tencent.com/data/alchemy-v20191129.zip'
+    print('Downloading {} to {} ...'.format(zip_url, zip_path), end='')
+    os.makedirs(scratch_dir, exist_ok=True)
+    urllib.request.urlretrieve(zip_url, zip_path)
+    print(' Done!')
 
-import rdkit
+csv_path = os.path.join(scratch_dir, 'Alchemy-v20191129', 'final_version.csv')
+if not os.path.exists(csv_path):
+    with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+        zip_ref.extractall(scratch_dir)
+else:
+    print("The file {} exists. Assume that all other files are there and \
+up-to-date, too. Skip unzipping of {}".format(csv_path, zip_path))
 
-
-# # Import the Alchemy Dataset from zipped xyzs and the pdf
-
-# In[ ]:
-
-
-get_ipython().system('pwd')
-
-
-# In[ ]:
-
-
-# Download the molecular data (zipped xyz files)
-if not os.path.exists("Alchemy/alchemy-v20191129.zip"):
-    get_ipython().system('mkdir -p Alchemy')
-    get_ipython().system('(cd Alchemy && wget https://alchemy.tencent.com/data/alchemy-v20191129.zip)')
-
-
-# In[ ]:
-
-
-get_ipython().system('(cd Alchemy && unzip "alchemy-v20191129.zip")')
-
-
-# In[ ]:
-
-
-basedir = '../schnetpack_exps/data/'
+tgt_dir = './data/'
+os.makedirs(tgt_dir, exist_ok=True)
 basename = 'alchemy'
-db_file    = os.path.join(basedir, basename + '.db')
-split_file = os.path.join(basedir, basename + '-split.npz')
-ids_file   = os.path.join(basedir, basename + '-original-ids.json')
-inchi_file = os.path.join(basedir, basename + '-inchis.json')
+db_file    = os.path.join(tgt_dir, basename + '.db')
+split_file = os.path.join(tgt_dir, basename + '-split.npz')
+ids_file   = os.path.join(tgt_dir, basename + '-original-ids.json')
+inchi_file = os.path.join(tgt_dir, basename + '-inchis.json')
 output_files = [db_file, split_file, ids_file, inchi_file]
 
-
-# In[ ]:
-
-
 if os.path.exists(db_file):
-    ret = input("Should I delete all output files '{}'? (y/n)".format(
-        ', '.join(output_files)))
+    ret = input("Database file exists. Should I delete all output files [{}] \
+and start over? (y/n)".format(', '.join(output_files)))
     if ret=='y':
         for file in output_files:
-            os.remove(file)
+            try:
+                os.remove(file)
+            except FileNotFoundError:
+                pass
+
 if not os.path.exists(db_file):
     print("Create a new dataset. Will re-create all other output files, too.")
     new_dataset = AtomsData(
@@ -75,11 +65,7 @@ else:
         inchis = json.load(f)
     fill_dataset = False
 
-
-# In[ ]:
-
-
-with open('Alchemy/Alchemy-v20191129/final_version.csv') as csvfile:
+with open(csv_path) as csvfile:
     reader = csv.reader(csvfile, delimiter=',')
     properties = {}
     keys = None
@@ -90,19 +76,11 @@ with open('Alchemy/Alchemy-v20191129/final_version.csv') as csvfile:
         ID, *vals = row
         properties[int(ID)] = {k.replace('\n', ' '): float(v) for k, v in zip(keys, vals)}
 
-
-# In[ ]:
-
-
 Ha = 27.2114 # 1Ha = 27.2eV
 for k, d in properties.items():
     d['homo'] = Ha * d['HOMO (Ha, energy of HOMO)']
     d['lumo'] = Ha * d['LUMO (Ha, energy of LUMO)']
     d['gap'] = d['lumo'] - d['homo'] 
-
-
-# In[ ]:
-
 
 from pprint import pprint
 for x in properties.items():
@@ -110,17 +88,14 @@ for x in properties.items():
     break
 
 
-# In[ ]:
-
-
+print('Filling dataset...')
 if fill_dataset:
     inchis = {}
-    for i, (k, p) in enumerate(properties.items()):
-        props = dict(list(p.items()) + [('alchemy_id', k)])
+    for i, (k, props) in enumerate(properties.items()):
+        props['alchemy_id'] = k
         for subdir in ['atom_9', 'atom_10', 'atom_11', 'atom_12']:
             path = os.path.join(
-                    'Alchemy', 'Alchemy-v20191129',
-                    subdir, '{}.sdf'.format(k))
+                scratch_dir, 'Alchemy-v20191129', subdir, '{}.sdf'.format(k))
             if os.path.exists(path):
                 # add to dataset:
                 new_dataset.add_system(
@@ -135,42 +110,33 @@ if fill_dataset:
                 inchis[str(i)] = inchi
                 break
         else: # Not found in any subdir:
-            raise '{} not found!'.format(k)
+            raise FileNotFoundError('{} not found!'.format(k))
         print('Progress: {:.1f}%'.format(100*i/len(properties)), end='\r')
     with open(inchi_file, 'w', encoding='utf-8') as f:
         json.dump(inchis, f, indent=0)
 else:
     print('Do not do anything. Just use the existing dataset and inchi list.')
+print('Dataset filled!')
 
 
-# ### Map local index to GDBMedChem id
-
-# In[ ]:
-
-
-if not os.path.exists(ids_file):
+print("For future reference, save the Alchemy IDs")
+if os.path.exists(ids_file):
+    with open(ids_file, 'r', encoding='utf-8') as f:
+        alchemy_ids = json.load(f)
+else:
     alchemy_ids = {}
     L = len(new_dataset)
     for i in range(L):
-        d = new_dataset[i]
-        alchemy_ids[str(int(d['_idx']))] = int(str(int(d['alchemy_id'])))
+        _, d = new_dataset.get_properties(i)
+        alchemy_ids[str(i)] = int(d['alchemy_id'])
         print('Progress: {:.1f}%'.format(100*i/len(new_dataset)), end='\r')
     with open(ids_file, 'w', encoding='utf-8') as f:
         json.dump(alchemy_ids, f, indent=0)
-else:
-    with open(ids_file, 'r', encoding='utf-8') as f:
-        alchemy_ids = json.load(f)
 
 
-# ### Get the train/valid/test split form the Alchemy Contest and convert to local idx
-
-# In[ ]:
-
-
-# Generate test files with the GDB ids of the train/test/validation split of the Alchemy contest
-from zipfile import ZipFile
+print('Get the train/valid/test split form the Alchemy Contest and convert to local idx')
 def gdb_ids_from_zipfile(infile, outfile):
-    zip = ZipFile(infile)
+    zip = zipfile.ZipFile(infile)
     lst = [n.split("/") for n in zip.namelist()]
     lst = [n[-1] for n in lst if len(n)==4]
     lst = [int(n[:-4]) for n in lst if n.endswith('.sdf')]
@@ -180,59 +146,41 @@ def gdb_ids_from_zipfile(infile, outfile):
             writer.writerow([n])
 
 for split in ['test', 'dev', 'valid']:
-    zipfile = "Alchemy/{}_v20190730.zip".format(split)
-    idfile = "Alchemy/{}_gdb_idx.txt".format(split)
+    idfile = os.path.join(scratch_dir, "{}_gdb_idx.txt".format(split))
     if not os.path.exists(idfile):
-        if not os.path.exists(zipfile):
-            print("Please download:")
-            print("wget https://alchemy.tencent.com/data/{}".format(zipfile))
-        gdb_ids_from_zipfile(zipfile, idfile)
-
-
-# In[ ]:
-
+        zip_path = os.path.join(scratch_dir, "{}_v20190730.zip".format(split))
+        if not os.path.exists(zip_path):
+            zip_url = "https://alchemy.tencent.com/data/{}_v20190730.zip".format(split)
+            print('Downloading {} to {} ...'.format(zip_url, zip_path), end='')
+            os.makedirs(scratch_dir, exist_ok=True)
+            urllib.request.urlretrieve(zip_url, zip_path)
+        gdb_ids_from_zipfile(zip_path, idfile)
+        print('Created {}.'.format(idfile))
+    else:
+        print('{} is present'.format(idfile))
 
 def get_idx_list(alchemy_id_file):
     index_from_alchemy_id = {v: k for k, v in alchemy_ids.items()}
     ids = []
     with open(alchemy_id_file) as csvfile:
         reader = csv.reader(csvfile, delimiter=',')
-        properties = {}
         for row in reader:
             ids.append(index_from_alchemy_id[int(row[0])])
     return(sorted(ids))
 
-
-# In[ ]:
-
-
 if not os.path.exists(split_file):
     np.savez(file=split_file,
-         train_idx=get_idx_list("Alchemy/dev_gdb_idx.txt"),
-         val_idx=get_idx_list("Alchemy/valid_gdb_idx.txt"),
-         test_idx=get_idx_list("Alchemy/test_gdb_idx.txt"))
+         train_idx=get_idx_list(os.path.join(scratch_dir, "dev_gdb_idx.txt")),
+         val_idx=get_idx_list(os.path.join(scratch_dir, "valid_gdb_idx.txt")),
+         test_idx=get_idx_list(os.path.join(scratch_dir, "test_gdb_idx.txt")))
 
 
-# ### Statistics on atom counts
-
-# In[ ]:
-
-
+print('Statistics on atom counts:')
 na_list = []
 for i in range(len(new_dataset)):
     amol = new_dataset[i]
     na_list.append(len(amol['_atomic_numbers']))
     print(i, end='\r')
-
-
-# In[114]:
-
-
-len(na_list), np.median(na_list), np.max(na_list)
-
-
-# In[ ]:
-
-
-
-
+print('Number of structures: ', len(na_list))
+print('Median number of atoms: ', np.median(na_list))
+print('Max number of atoms: ', np.max(na_list))

@@ -1,9 +1,9 @@
-#!/usr/bin/env python
-# coding: utf-8
+"""
+Prepare the data from the OE62 papercontest.
 
-# In[ ]:
-
-
+Prepare an ase database suitable for training a model with schnetpack. Save the
+attributes 'homo', 'lumo', and 'gap'.
+"""
 import os
 import pandas as pd
 import json
@@ -11,22 +11,23 @@ from schnetpack import AtomsData
 from OE62.helpers import get_level, xyz2ase
 
 
-# In[ ]:
+SRCDIR = os.path.join('scratch', 'OE62')
+TGTDIR = os.path.join('data', 'oe62')
 
-
-SRCDIR = 'OE62'
-TGTDIR = '../schnetpack_exps/data/oe62'
-
-
-# In[ ]:
+for file in [
+        'README',
+        # 'atomic_energies.ods',
+        'df_62k.json',
+        # 'df_31k.json', 'df_5k.json',
+        'SHA512sums',
+    ]:
+    if not os.path.exists(os.path.join(SRCDIR, file)):
+        print(file + ' does not exist in ' + SRCDIR + "!")
+        print('Please run oe62_0_download.sh first!')
+        exit(1)
 
 
 df_62k = pd.read_json(os.path.join(SRCDIR, 'df_62k.json'), orient='split')
-
-
-# ## Dump only the InChIs into a json file
-
-# In[ ]:
 
 
 df_inchis = df_62k['inchi']
@@ -34,17 +35,9 @@ df_inchis = df_62k['inchi']
 df_inchis = df_inchis.apply(lambda istr: istr.strip('\n'))
 
 
-# In[ ]:
-
-
 os.makedirs(TGTDIR, exist_ok=True)
 with open(os.path.join(TGTDIR, 'inchis.json'), 'w', encoding='utf-8') as f:
     json.dump(df_inchis.to_dict(), f, indent=0, sort_keys=True)
-
-
-# ## Convert data to schnetpack.AtomsData
-
-# In[ ]:
 
 
 db_file    = os.path.join(TGTDIR, 'data_v2.db')
@@ -52,15 +45,8 @@ ids_file   = os.path.join(TGTDIR, 'original-ids.json')
 inchi_file = os.path.join(TGTDIR, 'inchis.json')
 
 
-# In[ ]:
-
-
 subsets = ['PBE+vdW_vacuum', 'PBE0_vacuum']
 properties = [' '.join([q, l]) for l in subsets for q in ['homo', 'lumo', 'gap']] + ['oe62_id']
-
-
-# In[ ]:
-
 
 output_files = [db_file, ids_file, inchi_file]
 if os.path.exists(db_file):
@@ -84,9 +70,6 @@ else:
     with open(inchi_file, 'r', encoding='utf-8') as f:
         inchis = json.load(f)
     fill_dataset = False
-
-
-# In[ ]:
 
 
 inchis = {}
@@ -122,10 +105,3 @@ with open(inchi_file, 'w', encoding='utf-8') as f:
     json.dump(inchis, f, indent=0)
 with open(ids_file, 'w', encoding='utf-8') as f:
     json.dump(original_ids, f, indent=0)
-
-
-# In[ ]:
-
-
-
-

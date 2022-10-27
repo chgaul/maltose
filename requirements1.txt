@@ -5,3 +5,4 @@ schnetpack==1.0.1
 torch-geometric
 torch-scatter
 rdkit
+pandas

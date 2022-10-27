@@ -1,5 +1,5 @@
-# Get schnetpack from source at the required commit
--e git+https://github.com/atomistic-machine-learning/schnetpack@7a665f19b785addcc8f3e0abf9b1fd8fa6fe2c3d#egg=schnetpack
+# Get the required schnetpack version
+schnetpack==1.0.1
 
 # Further dependencies of current project
 torch-geometric

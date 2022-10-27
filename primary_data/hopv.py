@@ -52,27 +52,25 @@ def read_xyz(fp):
         xyz.iloc[i] = line[0], float(line[1]), float(line[2]), float(line[3])
     return xyz
 
-columns=['SMILES', 'InChI', 'EXPPROPS', 'CONFORMER', 'DFTPROPS', 'XYZ']
-
-data = pd.DataFrame(columns=columns)
-i = 0
-with open("Lopez_2016_HarvardOrganicPhotovoltaics/HOPV_15_revised_2.data") as fp:
-    while True:
-        smiles = fp.readline().rstrip()
-        if not smiles:
-            break
-        inchi = fp.readline().rstrip()
-        expdata = read_expprop(fp)
-        smiles2 = fp.readline().rstrip()
-        try:
+def read_dataset(data_path):
+    columns=['SMILES', 'InChI', 'EXPPROPS', 'CONFORMER', 'DFTPROPS', 'XYZ']
+    data = pd.DataFrame(columns=columns)
+    i = 0
+    with open(data_path) as fp:
+        while True:
+            smiles = fp.readline().rstrip()
+            if not smiles:
+                break
+            inchi = fp.readline().rstrip()
+            expdata = read_expprop(fp)
+            smiles2 = fp.readline().rstrip()
             nb_conformers = int(fp.readline())
-        except(ValueError):
-            print(line)
-            raise
-        for conformer in range(nb_conformers):
-            xyz = read_xyz(fp)
-            qchem = read_qchem(fp)
-            row = pd.DataFrame([[
-                smiles, inchi, expdata, conformer + 1, qchem, xyz]], index=[i], columns=columns)
-            data = pd.concat([data, row])
-            i = i + 1
+            for conformer in range(nb_conformers):
+                xyz = read_xyz(fp)
+                qchem = read_qchem(fp)
+                row = pd.DataFrame(
+                    [[smiles, inchi, expdata, conformer + 1, qchem, xyz]],
+                    index=[i], columns=columns)
+                data = pd.concat([data, row])
+                i = i + 1
+    return data

@@ -6,3 +6,6 @@ torch-geometric
 torch-scatter
 rdkit
 pandas
+
+networkx
+git+https://github.com/jensengroup/xyz2mol@v0.1.2#egg=xyz2mol

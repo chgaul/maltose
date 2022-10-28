@@ -1,13 +1,4 @@
-# First install the basic requirements (in particular torch!)
-# These are the same as the requirements of schnetpack.
-
-PyYAML
---index-url https://pypi.python.org/simple/
+# First, install the basic requirements (in particular torch!):
 torch>=1.8.0
 numpy
 ase>=3.19
-tensorboardX
-h5py
-tqdm
-pytest
-pytest-datadir

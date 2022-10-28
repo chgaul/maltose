@@ -1,33 +1,44 @@
 """
-Prepare the data from the OE62 papercontest.
+Prepare the data from the OE62 paper.
 
 Prepare an ase database suitable for training a model with schnetpack. Save the
 attributes 'homo', 'lumo', and 'gap'.
 """
 import os
+import subprocess
 import pandas as pd
 import json
 from schnetpack import AtomsData
-from OE62.helpers import get_level, xyz2ase
+from maltose.primary_data.OE62.helpers import get_level, xyz2ase
 
 
-SRCDIR = os.path.join('scratch', 'OE62')
-TGTDIR = os.path.join('data', 'oe62')
+download_dir = os.path.join('scratch', 'OE62')
+target_dir = os.path.join('data', 'oe62')
 
 for file in [
         'README',
-        # 'atomic_energies.ods',
         'df_62k.json',
+        # 'atomic_energies.ods',
         # 'df_31k.json', 'df_5k.json',
-        'SHA512sums',
+        # 'SHA512sums',
     ]:
-    if not os.path.exists(os.path.join(SRCDIR, file)):
-        print(file + ' does not exist in ' + SRCDIR + "!")
-        print('Please run oe62_0_download.sh first!')
-        exit(1)
+    download_path = os.path.join(download_dir, file)
+    if not os.path.exists(download_path):
+        print('Downloading {} ...'.format(file), end='')
+        os.makedirs(download_dir, exist_ok=True)
+        try:
+            subprocess.call([
+                'rsync', '-az',
+                'rsync://m1507656@dataserv.ub.tum.de/m1507656/{}'.format(file),
+                download_dir], env={'RSYNC_PASSWORD': 'm1507656'})
+        except Exception as e:
+            print('\n\nSomething went wrong with the rsync download!')
+            print('Try manually to download the file {} data.'.format(file))
+            print('See https://doi.org/10.14459/2019mp1507656.\n')
+            raise(e)
+        print(' Done!')
 
-
-df_62k = pd.read_json(os.path.join(SRCDIR, 'df_62k.json'), orient='split')
+df_62k = pd.read_json(os.path.join(download_dir, 'df_62k.json'), orient='split')
 
 
 df_inchis = df_62k['inchi']
@@ -35,14 +46,14 @@ df_inchis = df_62k['inchi']
 df_inchis = df_inchis.apply(lambda istr: istr.strip('\n'))
 
 
-os.makedirs(TGTDIR, exist_ok=True)
-with open(os.path.join(TGTDIR, 'inchis.json'), 'w', encoding='utf-8') as f:
+os.makedirs(target_dir, exist_ok=True)
+with open(os.path.join(target_dir, 'inchis.json'), 'w', encoding='utf-8') as f:
     json.dump(df_inchis.to_dict(), f, indent=0, sort_keys=True)
 
 
-db_file    = os.path.join(TGTDIR, 'data_v2.db')
-ids_file   = os.path.join(TGTDIR, 'original-ids.json')
-inchi_file = os.path.join(TGTDIR, 'inchis.json')
+db_file    = os.path.join(target_dir, 'data_v2.db')
+ids_file   = os.path.join(target_dir, 'original-ids.json')
+inchi_file = os.path.join(target_dir, 'inchis.json')
 
 
 subsets = ['PBE+vdW_vacuum', 'PBE0_vacuum']
@@ -50,27 +61,23 @@ properties = [' '.join([q, l]) for l in subsets for q in ['homo', 'lumo', 'gap']
 
 output_files = [db_file, ids_file, inchi_file]
 if os.path.exists(db_file):
-    ret = input("Should I delete all output files '{}'? (y/n)".format(
-        ', '.join(output_files)))
-    if ret=='y':
+    ret = input("Database file {} exists. Delete all output files ({})\
+ and start over? (y/n)".format(db_file, ', '.join(output_files)))
+    if ret == 'y':
         for file in output_files:
             try:
                 os.remove(file)
             except OSError:
                 pass
-if not os.path.exists(db_file):
-    print("Create a new dataset. Will (re-)create all other output files, too.")
-    new_dataset = AtomsData(
-        db_file,
-        available_properties=properties)
-    fill_dataset = True
-else:
-    print("Open existing dataset. Will leave other files untouched, too.")
-    new_dataset = AtomsData(db_file)
-    with open(inchi_file, 'r', encoding='utf-8') as f:
-        inchis = json.load(f)
-    fill_dataset = False
+    else:
+        print('Exiting.')
+        exit(0)
+assert not os.path.exists(db_file)
 
+print("Create a new dataset. Will (re-)create all other output files, too.")
+new_dataset = AtomsData(
+    db_file,
+    available_properties=properties)
 
 inchis = {}
 original_ids = {}

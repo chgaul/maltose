@@ -6,7 +6,7 @@ Import the data from the Harvard Organic Photovoltaic Dataset to SchNetPack
 """
 import os
 import urllib.request
-from hopv import read_dataset
+from maltose.primary_data.hopv import read_dataset
 from ase import Atoms
 from schnetpack.data.atoms import AtomsData
 import json

@@ -59,5 +59,5 @@ for filename in os.listdir(in_dir):
 
 # Copy the annotations table to the data folder
 shutil.copyfile(
-    os.path.join('Kuzmich2017', 'table1.csv'),
+    os.path.join('maltose', 'primary_data', 'Kuzmich2017', 'table1.csv'),
     os.path.join('data', 'Kuzmich2017', 'table1.csv'))

@@ -33,13 +33,12 @@ else:
     print("The file {} exists. Assume that all other files are there and \
 up-to-date, too. Skip unzipping of {}".format(csv_path, zip_path))
 
-tgt_dir = './data/'
+tgt_dir = './data/alchemy/'
 os.makedirs(tgt_dir, exist_ok=True)
-basename = 'alchemy'
-db_file    = os.path.join(tgt_dir, basename + '.db')
-split_file = os.path.join(tgt_dir, basename + '-split.npz')
-ids_file   = os.path.join(tgt_dir, basename + '-original-ids.json')
-inchi_file = os.path.join(tgt_dir, basename + '-inchis.json')
+db_file    = os.path.join(tgt_dir, 'data.db')
+split_file = os.path.join(tgt_dir, 'split.npz')
+ids_file   = os.path.join(tgt_dir, 'original-ids.json')
+inchi_file = os.path.join(tgt_dir, 'inchis.json')
 output_files = [db_file, split_file, ids_file, inchi_file]
 
 if os.path.exists(db_file):

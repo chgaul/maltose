@@ -40,7 +40,7 @@ dirname = os.path.join("data", "hopv")
 if not os.path.exists(dirname):
     os.makedirs(dirname)
 
-dbname = os.path.join(dirname, "main.db")
+dbname = os.path.join(dirname, "data.db")
 assert not os.path.exists(dbname), "Target db {} exits. Please delete!".format(
     dbname)
 print('Filling AtomsData ...', end='')

@@ -51,7 +51,7 @@ with open(os.path.join(target_dir, 'inchis.json'), 'w', encoding='utf-8') as f:
     json.dump(df_inchis.to_dict(), f, indent=0, sort_keys=True)
 
 
-db_file    = os.path.join(target_dir, 'data_v2.db')
+db_file    = os.path.join(target_dir, 'data.db')
 ids_file   = os.path.join(target_dir, 'original-ids.json')
 inchi_file = os.path.join(target_dir, 'inchis.json')
 

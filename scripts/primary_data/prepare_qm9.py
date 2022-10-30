@@ -7,8 +7,8 @@ from maltose.conversions import xyz2rdkit
 from schnetpack.datasets import QM9
 
 # How to handle paths to data properly?
-base_path = '/home/cgaul/MaLTOSe2020/schnetpack_exps/data'
-qm9_path = os.path.join(base_path, 'qm9.db')
+base_path = 'data/qm9'
+qm9_path = os.path.join(base_path, 'data.db')
 
 # Assure that the QM9 database is downloaded via schnetpack
 QM9(qm9_path)
@@ -25,7 +25,7 @@ for idx in range(0, len(db)):
         atoms = row.toatoms()
         
         tmpdir = tempfile.TemporaryDirectory()
-        xyzfile = os.path.join(tmpdir.name, 'test.xyz')
+        xyzfile = os.path.join(tmpdir.name, 'tmp.xyz')
         ase.io.write(xyzfile, atoms)
         try:
             try:
@@ -55,10 +55,10 @@ print('Successful: {}; Failed: {} ({}%)'.format(
     success, len(failed), len(failed)/(success + len(failed))))
 
 # Dump the dictionary idx -> InChI
-inchi_file = os.path.join(base_path, 'qm9-inchis.json')
+inchi_file = os.path.join(base_path, 'inchis.json')
 with open(inchi_file, 'w', encoding='utf-8') as f:
     json.dump(inchis, f, indent=0)
 
 # Dump the list of idx where no InChI could be obtained
-with open(os.path.join(base_path, 'qm9-inchi-failed.json'), 'w', encoding='utf-8') as f:
+with open(os.path.join(base_path, 'inchi-failed.json'), 'w', encoding='utf-8') as f:
     json.dump(failed, f, indent=0)

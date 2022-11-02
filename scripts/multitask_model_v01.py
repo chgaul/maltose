@@ -74,7 +74,7 @@ for dataset_name, mapping in [
         print(dataset_file , 'does not exist!')
         print('Please run the respective scipt in scripts/primary_data/ first,')
         print('and make sure the --data-base-dir is specified correctly.')
-    dataset = AtomsData(dataset_file, load_only=properties)
+    dataset = AtomsData(dataset_file)
     split_file = os.path.join(data_base_dir, dataset_name, 'split_v2.npz')
     if not os.path.exists(split_file):
         print(split_file, 'does not exist!')

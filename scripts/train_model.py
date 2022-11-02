@@ -8,21 +8,20 @@ Multitask Model trained on the Unified DB
 import argparse
 import numpy as np
 import logging
-import torch
-from torch.optim import Adam
 import os
 import schnetpack as spk
 import schnetpack.atomistic.model
-from schnetpack.train import Trainer, CSVHook, ReduceLROnPlateauHook
+from schnetpack.train import Trainer, CSVHook
 from schnetpack.train.metrics import MeanAbsoluteError
 
-from maltose.output_modules import Set2Set
-from maltose.loss import build_gated_mse_loss
 from maltose.metrics import MultitaskMetricWrapper
 
 import multitask_data
 
 parser = argparse.ArgumentParser()
+parser.add_argument(
+    "--config", type=str, required=True,
+    help="Name of the configuration to be trained, e.g., multitask_model_v01.")
 parser.add_argument(
     "--model-base-dir", default="./models",
     help="Parent directory for the trained model.")
@@ -34,9 +33,16 @@ parser.add_argument(
     help="Device for running the training. For example 'cpu', 'cuda', 'cuda:2'")
 args = parser.parse_args()
 
+import importlib
+
+module_name = 'configs.{config_name}'.format(config_name=args.config)
+print('Trying to load {}'.format(module_name))
+config = importlib.import_module(module_name)
+
+
 # basic settings
 device = args.device
-model_dir = os.path.join(args.model_base_dir, "multitask_model_v01")
+model_dir = os.path.join(args.model_base_dir, args.config)
 
 logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO"))
 
@@ -48,8 +54,9 @@ else:
     for file in os.listdir(model_dir):
         print(file)
 
-properties = ['HOMO-B3LYP', 'LUMO-B3LYP', 'Gap-B3LYP', 'HOMO-PBE0', 'LUMO-PBE0', 'Gap-PBE0']
-batch_size = 16
+properties = config.properties
+batch_size = config.batch_size
+
 
 logging.info("Preparing the datasets")
 train, val, _ = multitask_data.join_multitask_data(
@@ -60,6 +67,9 @@ val_loader = spk.AtomsLoader(val, batch_size=batch_size)
 
 print('Size of training set: ', len(train))
 print('Size of validation set: ', len(val))
+
+
+logging.info("Check mean and variance of training data")
 
 # Measure mean and variance of the predicted properties (on a random sample)
 def measure_mean_std(n_batches, batch_size):    
@@ -72,57 +82,37 @@ def measure_mean_std(n_batches, batch_size):
             valids[p].append(data[:, 1][validity])
         print(len(valids[p]), end='\r')
         if i==n_batches: break
-    for p in properties:
-        arr = np.concatenate(valids[p])
-        print('{:>10} ({} items): mean={:.2f}, std={:.2f}'.format(p, len(arr), np.mean(arr), np.std(arr)))
-measure_mean_std(100, 100)
+    arrs = [np.concatenate(valids[p]) for p in properties]
+    return [np.mean(arr) for arr in arrs], [np.std(arr) for arr in arrs]
+
+measured_means, measured_stds = measure_mean_std(100, 100)
+
+# For reproducibility, use precomputed statistics for mean and std
+for m, c in zip(measured_means, config.meanstensor):
+    assert np.abs(m - float(c)) < 0.07
+for m, c in zip(measured_stds, config.stddevstensor):
+    assert np.abs(m - float(c)) < 0.07
 
 
 logging.info("Setting up the model")
-# For reproducibility, use precomputed statistics for mean and std
-meanstensor = torch.tensor([-6.35, 0.17, 6.52, -6.48, -1.56, 4.92])
-stddevstensor = torch.tensor([0.71, 1.28, 1.51, 0.71, 0.91, 1.17])
-
-representation = spk.SchNet(n_interactions=6)
-output_modules = [
-    Set2Set(
-        n_in=representation.n_atom_basis,
-        processing_steps=3,
-        m_net_layers=2,
-        m_net_neurons=32,
-        properties=properties,
-        means=meanstensor,
-        stddevs=stddevstensor,
-    )
-]
-model = schnetpack.AtomisticModel(representation, output_modules)
-
-# build the optimizer
-optimizer = Adam(model.parameters(), lr=1e-4)
-
 # hooks
 metrics = [MultitaskMetricWrapper(MeanAbsoluteError(p, p)) for p in properties]
+
 hooks = [
-    CSVHook(log_path=model_dir, metrics=metrics),
-    ReduceLROnPlateauHook(
-        optimizer,
-        min_lr=0.5e-6,
-        stop_after_min=True),
-]
+        CSVHook(log_path=model_dir, metrics=metrics),
+    ] + config.hooks
 
-loss = build_gated_mse_loss(properties)
 
-# run training
+logging.info("Training")
 trainer = Trainer(
     model_dir,
-    model=model,
+    model=config.model,
     hooks=hooks,
-    loss_fn=loss,
-    optimizer=optimizer,
+    loss_fn=config.loss,
+    optimizer=config.optimizer,
     train_loader=train_loader,
     validation_loader=val_loader,
     keep_n_checkpoints=40,
     checkpoint_interval=10,
 )
-logging.info("Training")
 trainer.train(device=device)

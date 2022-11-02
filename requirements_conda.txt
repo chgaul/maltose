@@ -1,0 +1,13 @@
+# Further dependencies of current project
+cudatoolkit
+pytorch
+schnetpack==1.0.1
+
+pytorch_geometric
+pytorch_scatter
+
+rdkit
+pandas
+xyz2mol
+
+build

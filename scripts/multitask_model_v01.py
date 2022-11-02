@@ -36,7 +36,6 @@ args = parser.parse_args()
 
 # basic settings
 device = args.device
-data_base_dir = args.data_base_dir
 model_dir = os.path.join(args.model_base_dir, "multitask_model_v01")
 
 logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO"))
@@ -52,9 +51,9 @@ else:
 properties = ['HOMO-B3LYP', 'LUMO-B3LYP', 'Gap-B3LYP', 'HOMO-PBE0', 'LUMO-PBE0', 'Gap-PBE0']
 batch_size = 16
 
-
 logging.info("Preparing the datasets")
-train, val, _ = multitask_data.join_multitask_data(data_base_dir)
+train, val, _ = multitask_data.join_multitask_data(
+    args.data_base_dir, select_tasks=properties)
 
 train_loader = spk.AtomsLoader(train, batch_size=batch_size, shuffle=True)
 val_loader = spk.AtomsLoader(val, batch_size=batch_size)

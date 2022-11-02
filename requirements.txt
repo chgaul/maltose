@@ -3,6 +3,7 @@ schnetpack==1.0.1
 
 # Further dependencies of current project
 torch-geometric
+torch-sparse
 torch-scatter
 rdkit
 pandas

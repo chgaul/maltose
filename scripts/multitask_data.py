@@ -26,7 +26,7 @@ def join_multitask_data(
     }
     for dataset_name, mapping in tgt_mappings.items():
         if select_datasets is not None and not dataset_name in select_datasets:
-            print('Skippin dataset', dataset_name)
+            print('Skipping dataset', dataset_name)
             continue
         dataset_file = os.path.join(data_base_dir, dataset_name, 'data.db')
         if not os.path.exists(dataset_file):

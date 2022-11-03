@@ -22,6 +22,7 @@ datasets = ['qm9', 'alchemy', 'oe62', 'hopv']
 batch_size = 16
 
 # For reproducibility, use precomputed statistics for mean and std
+divide_by_atoms = False
 meanstensor = torch.tensor([-6.35, 0.17, 6.52, -6.48, -1.56, 4.92])
 stddevstensor = torch.tensor([0.71, 1.28, 1.51, 0.71, 0.91, 1.17])
 

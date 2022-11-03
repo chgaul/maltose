@@ -74,27 +74,37 @@ print('Size of validation set: ', len(val))
 logging.info("Check mean and variance of training data")
 
 # Measure mean and variance of the predicted properties (on a random sample)
-def measure_mean_std(n_batches, batch_size):    
-    loader = spk.AtomsLoader(train, batch_size=batch_size, shuffle=True)
+def measure_mean_std(n_batches, divide_by_atoms):
+    loader = spk.AtomsLoader(train, batch_size=1, shuffle=True)
     valids = {p: [] for p in properties}
     for i, b in enumerate(loader):
+        if i % 10 == 0:
+            print(i, '/', n_batches, end='\r')
+        n_atoms = len(b['_atomic_numbers'][0])
         for p in properties:
-            data = np.array(b[p])
-            validity = data[:, 0] > 0
-            valids[p].append(data[:, 1][validity])
-        print(len(valids[p]), end='\r')
+            dt = np.array(b[p])
+            validity = dt[:, 0] > 0
+            if divide_by_atoms:
+                valids[p].append(dt[:, 1][validity]/n_atoms)
+            else:
+                valids[p].append(dt[:, 1][validity])
         if i==n_batches: break
     arrs = [np.concatenate(valids[p]) for p in properties]
     return [np.mean(arr) for arr in arrs], [np.std(arr) for arr in arrs]
 
-measured_means, measured_stds = measure_mean_std(100, 100)
+measured_means, measured_stds = measure_mean_std(
+        10000, divide_by_atoms=config.divide_by_atoms)
 
-# For reproducibility, use precomputed statistics for mean and std
-for m, c in zip(measured_means, config.meanstensor):
-    assert np.abs(m - float(c)) < 0.07
-for m, c in zip(measured_stds, config.stddevstensor):
-    assert np.abs(m - float(c)) < 0.07
-
+# Check that the measured statistics coincide roughly with the precomputed
+# statistics from the config:
+reference_magnitude = np.sqrt(np.mean(np.square(measured_means)))
+for p, m, c in zip(properties, measured_means, config.meanstensor):
+    assert np.abs(m - float(c)) < 0.05 * reference_magnitude, \
+        "{}: configured and measured mean differ: {}!={}".format(p, c, m)
+reference_magnitude = np.sqrt(np.mean(np.square(measured_stds)))
+for p, m, c in zip(properties, measured_stds, config.stddevstensor):
+    assert np.abs(m - float(c)) < 0.1 * reference_magnitude, \
+        "{}: configured and measured std differ: {}!={}".format(p, c, m)
 
 logging.info("Setting up the model")
 # hooks

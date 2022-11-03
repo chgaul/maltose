@@ -18,6 +18,7 @@ from maltose.metrics import MultitaskMetricWrapper
 
 
 properties = ['HOMO-B3LYP', 'LUMO-B3LYP', 'Gap-B3LYP', 'HOMO-PBE0', 'LUMO-PBE0', 'Gap-PBE0']
+datasets = ['qm9', 'alchemy', 'oe62', 'hopv']
 batch_size = 16
 
 # For reproducibility, use precomputed statistics for mean and std

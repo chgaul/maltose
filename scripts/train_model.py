@@ -60,7 +60,9 @@ batch_size = config.batch_size
 
 logging.info("Preparing the datasets")
 train, val, _ = multitask_data.join_multitask_data(
-    args.data_base_dir, select_tasks=properties)
+    args.data_base_dir,
+    select_tasks=properties,
+    select_datasets=config.datasets)
 
 train_loader = spk.AtomsLoader(train, batch_size=batch_size, shuffle=True)
 val_loader = spk.AtomsLoader(val, batch_size=batch_size)

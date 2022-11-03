@@ -23,7 +23,7 @@ batch_size = 16
 
 # Precomputed statistics
 divide_by_atoms = True
-meanstensor = torch.tensor([-0.3748, 0.095, 0.3843])
+meanstensor = torch.tensor([-0.3748, 0.0095, 0.3843])
 stddevstensor = torch.tensor([0.0863, 0.0756, 0.0722])
 
 # model build

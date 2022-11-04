@@ -11,7 +11,7 @@ import torch
 from torch.optim import Adam
 import schnetpack as spk
 import schnetpack.atomistic.model
-from schnetpack.train import ReduceLROnPlateauHook
+from schnetpack.train import ReduceLROnPlateauHook, CSVHook
 from schnetpack.train.metrics import MeanAbsoluteError
 
 from maltose.loss import build_gated_mse_loss
@@ -40,20 +40,21 @@ output_modules = [
         stddev=stddevs[prop],
         aggregation_mode="sum",
         property=prop,
-    )
-for prop in properties]
+    ) for prop in properties]
 model = schnetpack.AtomisticModel(representation, output_modules)
 
-# build optimizer
-optimizer = Adam(model.parameters(), lr=1e-4)
+def build_optimizer(model):
+    return Adam(model.parameters(), lr=1e-4)
 
-# hooks
-metrics = [MultitaskMetricWrapper(MeanAbsoluteError(p, p)) for p in properties]
-hooks = [
-    ReduceLROnPlateauHook(
-        optimizer,
-        min_lr=0.5e-6,
-        stop_after_min=True),
-]
+def build_hooks(optimizer, log_path):
+    metrics = [MultitaskMetricWrapper(MeanAbsoluteError(p, p)) for p in properties]
+    return [
+        CSVHook(log_path=log_path, metrics=metrics),
+        ReduceLROnPlateauHook(
+            optimizer,
+            min_lr=0.5e-6,
+            stop_after_min=True),
+    ]
 
-loss = build_gated_mse_loss(properties)
+def build_loss():
+    return build_gated_mse_loss(properties)

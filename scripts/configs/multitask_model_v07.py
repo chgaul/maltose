@@ -12,7 +12,7 @@ import torch
 from torch.optim import Adam
 import schnetpack as spk
 import schnetpack.atomistic.model
-from schnetpack.train import ReduceLROnPlateauHook
+from schnetpack.train import ReduceLROnPlateauHook, CSVHook
 from schnetpack.train.metrics import MeanAbsoluteError
 
 from maltose.output_modules import Set2Set
@@ -30,30 +30,33 @@ meanstensor = torch.tensor([-6.37, 0.24, 6.61, -6.61, -1.48, 5.12])
 stddevstensor = torch.tensor([0.68, 1.24, 1.44, 0.68, 0.86, 1.05])
 
 # model build
-representation = spk.SchNet(n_interactions=6)
-output_modules = [
-    Set2Set(
-        n_in=representation.n_atom_basis,
-        processing_steps=3,
-        m_net_layers=2,
-        m_net_neurons=32,
-        properties=properties,
-        means=meanstensor,
-        stddevs=stddevstensor,
-    )
-]
-model = schnetpack.AtomisticModel(representation, output_modules)
+def build_model():
+    representation = spk.SchNet(n_interactions=6)
+    output_modules = [
+        Set2Set(
+            n_in=representation.n_atom_basis,
+            processing_steps=3,
+            m_net_layers=2,
+            m_net_neurons=32,
+            properties=properties,
+            means=meanstensor,
+            stddevs=stddevstensor,
+        )
+    ]
+    return schnetpack.AtomisticModel(representation, output_modules)
 
-# build optimizer
-optimizer = Adam(model.parameters(), lr=1e-4)
+def build_optimizer(model):
+    return Adam(model.parameters(), lr=1e-4)
 
-# hooks
-metrics = [MultitaskMetricWrapper(MeanAbsoluteError(p, p)) for p in properties]
-hooks = [
-    ReduceLROnPlateauHook(
-        optimizer,
-        min_lr=0.5e-6,
-        stop_after_min=True),
-]
+def build_hooks(optimizer, log_path):
+    metrics = [MultitaskMetricWrapper(MeanAbsoluteError(p, p)) for p in properties]
+    return [
+        CSVHook(log_path=log_path, metrics=metrics),
+        ReduceLROnPlateauHook(
+            optimizer,
+            min_lr=0.5e-6,
+            stop_after_min=True),
+    ]
 
-loss = build_gated_mse_loss(properties)
+def build_loss():
+    return build_gated_mse_loss(properties)

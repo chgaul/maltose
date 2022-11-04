@@ -11,7 +11,7 @@ import logging
 import os
 import schnetpack as spk
 import schnetpack.atomistic.model
-from schnetpack.train import Trainer, CSVHook
+from schnetpack.train import Trainer
 from schnetpack.train.metrics import MeanAbsoluteError
 
 from maltose.metrics import MultitaskMetricWrapper
@@ -110,18 +110,18 @@ logging.info("Setting up the model")
 # hooks
 metrics = [MultitaskMetricWrapper(MeanAbsoluteError(p, p)) for p in properties]
 
-hooks = [
-        CSVHook(log_path=model_dir, metrics=metrics),
-    ] + config.hooks
-
+model = config.build_model()
+optimizer = config.build_optimizer(model)
+hooks = config.build_hooks(optimizer, log_path=model_dir)
+loss_fn = config.build_loss()
 
 logging.info("Training")
 trainer = Trainer(
     model_dir,
-    model=config.model,
+    model=model,
     hooks=hooks,
-    loss_fn=config.loss,
-    optimizer=config.optimizer,
+    loss_fn=loss_fn,
+    optimizer=optimizer,
     train_loader=train_loader,
     validation_loader=val_loader,
     keep_n_checkpoints=40,

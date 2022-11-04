@@ -19,6 +19,8 @@ TARGET_MAPPINGS = {
         ('HOMO-PBE0', 'HOMO PBE0/def2-SVP'), ('LUMO-PBE0', 'LUMO PBE0/def2-SVP'), ('Gap-PBE0', 'Gap PBE0/def2-SVP')]
 }
 
+DATASET_NAMES = list(TARGET_MAPPINGS.keys())
+
 def split_dataset(data_base_dir, dataset_name, select_tasks=None):
 
     dataset_file = os.path.join(data_base_dir, dataset_name, 'data.db')

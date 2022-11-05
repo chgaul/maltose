@@ -2,4 +2,5 @@ dist
 scratch
 data
 models
+figures
 __pycache__

@@ -81,18 +81,19 @@ def compute_regular_data(
     }
 
 # Functions to evaluate the Kuzmich 2017 data, which is in xyz format
-def predict_on_xyz(model, xyzfile):
-    return model.forward(
-        schnetpack.data.loader._collate_aseatoms([
-            schnetpack.data.atoms.torchify_dict(
-                schnetpack.data.atoms._convert_atoms(
-                    ase.io.read(xyzfile)
-                )
+def predict_on_xyz(model, xyzfile, device='cpu'):
+    mol = schnetpack.data.loader._collate_aseatoms([
+        schnetpack.data.atoms.torchify_dict(
+            schnetpack.data.atoms._convert_atoms(
+                ase.io.read(xyzfile)
             )
-        ])
-    )
+        )
+    ])
+    mol = {k: v.to(device) for k, v in mol.items()}
+    return model.forward(mol)
 
-def evaluate_kuzmich(model, data_base_dir, seed=None, n_points=-1):
+def evaluate_kuzmich(
+        model, data_base_dir, seed=None, n_points=-1, device='cpu'):
     kuzmich_dir = os.path.join(data_base_dir, 'Kuzmich2017')
     df = pd.read_csv(os.path.join(kuzmich_dir, 'table1.csv'))
     mapping = {
@@ -125,7 +126,7 @@ def evaluate_kuzmich(model, data_base_dir, seed=None, n_points=-1):
     ret = {}
     for lb, (f, id) in fs[:n_points]:
         xyzfile = os.path.join(kuzmich_dir, 'xyz', f)
-        pred = predict_on_xyz(model, xyzfile)
+        pred = predict_on_xyz(model, xyzfile, device=device)
         est = {k: float(v) for k, v in pred.items()}
         tgt = {
             'LUMO-B3LYP': float(df[df['Acceptor’s Label']==id]['LUMO (eV)'])
@@ -143,9 +144,11 @@ def add_kuzmich(
         model,
         data_base_dir: str,
         seed: int = None,
-        n_points: int = -1):
+        n_points: int = -1,
+        device='cpu'):
     tgt_est_kuzmich = evaluate_kuzmich(
-        model, data_base_dir=data_base_dir, seed=seed, n_points=n_points)
+        model, data_base_dir=data_base_dir, seed=seed, n_points=n_points,
+        device=device)
     # Drop keys:
     k_data = list(tgt_est_kuzmich.values())
     ret = {

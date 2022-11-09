@@ -40,6 +40,7 @@ def load_model(model_name):
         print('Loading', state_path)
         model.load_state_dict(torch.load(state_path))
         model.eval()
+        model.to(args.device)
         return model
     elif os.path.exists(model_path):
         print('Loading', model_path)
@@ -62,9 +63,11 @@ target_file = os.path.join(model_dir(model_name), 'deviations.npz')
 if not os.path.exists(target_file):
     est_properties = evaluation.get_available_properties(model=model)
     tgt_est = evaluation.compute_regular_data(
-        model, data_base_dir, n_points=None, seed=RANDOMSEED)
+        model, data_base_dir, n_points=None, seed=RANDOMSEED,
+        device=args.device)
     evaluation.add_kuzmich(
-        tgt_est, model, data_base_dir, n_points=-1, seed=RANDOMSEED)
+        tgt_est, model, data_base_dir, n_points=-1, seed=RANDOMSEED,
+        device=args.device)
     devs = {}
     for test, data in tgt_est.items():
         print(test)

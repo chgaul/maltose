@@ -31,6 +31,10 @@ parser.add_argument(
 parser.add_argument(
     "--device", default="cpu",
     help="Device for running the training. For example 'cpu', 'cuda', 'cuda:2'")
+parser.add_argument(
+    "--ignore-stats", action='store_true',
+    help="In the case of mismatch between the configured and measured target "
+    + "statistics, do not throw an exception, just print a warning")
 args = parser.parse_args()
 
 import importlib
@@ -99,12 +103,20 @@ measured_means, measured_stds = measure_mean_std(
 # statistics from the config:
 reference_magnitude = np.sqrt(np.mean(np.square(measured_means)))
 for p, m, c in zip(properties, measured_means, config.meanstensor):
-    assert np.abs(m - float(c)) < 0.05 * reference_magnitude, \
-        "{}: configured and measured mean differ: {}!={}".format(p, c, m)
+    if not np.abs(m - float(c)) < 0.05 * reference_magnitude:
+        msg = "{}: configured and measured mean differ: {}!={}".format(p, c, m)
+        if args.ignore_stats:
+            print(msg)
+        else:
+            raise RuntimeError(msg)
 reference_magnitude = np.sqrt(np.mean(np.square(measured_stds)))
 for p, m, c in zip(properties, measured_stds, config.stddevstensor):
-    assert np.abs(m - float(c)) < 0.1 * reference_magnitude, \
-        "{}: configured and measured std differ: {}!={}".format(p, c, m)
+    if not np.abs(m - float(c)) < 0.1 * reference_magnitude:
+        msg = "{}: configured and measured std differ: {}!={}".format(p, c, m)
+        if args.ignore_stats:
+            print(msg)
+        else:
+            raise RuntimeError(msg)
 
 logging.info("Setting up the model")
 # hooks

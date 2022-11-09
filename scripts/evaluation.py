@@ -1,6 +1,5 @@
 import os
 import numpy as np
-import matplotlib.pyplot as plt
 import pandas as pd
 import ase.io
 import torch
@@ -71,8 +70,8 @@ def evaluate_unified(
     return ret
 
 def compute_regular_data(
-        model, n_points=100, seed=None,
-        data_base_dir=default_data_base_dir, device='cpu'):
+        model, data_base_dir=default_data_base_dir,
+        n_points=None, seed=None, device='cpu'):
     return {
         dataset_name: evaluate_unified(
             model, dataset_name,
@@ -80,3 +79,82 @@ def compute_regular_data(
             device=device,
             data_base_dir=data_base_dir) for dataset_name in DATASET_NAMES
     }
+
+# Functions to evaluate the Kuzmich 2017 data, which is in xyz format
+def predict_on_xyz(model, xyzfile):
+    return model.forward(
+        schnetpack.data.loader._collate_aseatoms([
+            schnetpack.data.atoms.torchify_dict(
+                schnetpack.data.atoms._convert_atoms(
+                    ase.io.read(xyzfile)
+                )
+            )
+        ])
+    )
+
+def evaluate_kuzmich(model, data_base_dir, seed=None, n_points=-1):
+    kuzmich_dir = os.path.join(data_base_dir, 'Kuzmich2017')
+    df = pd.read_csv(os.path.join(kuzmich_dir, 'table1.csv'))
+    mapping = {
+        'DTDfBTTDPP2': 'DTDfBT(TDPP)2',
+        '10_DBFI-MTT': 'DBFI-MTT',
+    }
+    ambiguous = ['M10']
+
+    # Get valid files and establish canonical order
+    files = {}
+    for f in sorted(os.listdir(os.path.join(kuzmich_dir, 'xyz'))):
+        if f.endswith('.xyz'):
+            id = f[3:-13]
+            if id in mapping:
+                id = mapping[id]
+            if id in ambiguous:
+                print('Kuzmich2017: omitting ambiguous id: {}'.format(f[3:-13]))
+                continue
+            lb = f[3:-13]
+            files[lb] = (f, id)
+    # Sort by keys:
+    fs = sorted(list(files.items()))
+
+    # Shuffle order
+    if seed is not None:
+        random_state = np.random.RandomState(seed=seed)
+        random_state.shuffle(fs)
+
+    # Compute only on the desired random subset
+    ret = {}
+    for lb, (f, id) in fs[:n_points]:
+        xyzfile = os.path.join(kuzmich_dir, 'xyz', f)
+        pred = predict_on_xyz(model, xyzfile)
+        est = {k: float(v) for k, v in pred.items()}
+        tgt = {
+            'LUMO-B3LYP': float(df[df['Acceptor’s Label']==id]['LUMO (eV)'])
+        }
+        ret[lb] = {
+            'tgt': tgt,
+            'est': est,
+        }
+    return ret
+
+# Bring data into the regular format and add it to the
+# target-estimates collection:
+def add_kuzmich(
+        tgt_est: dict,
+        model,
+        data_base_dir: str,
+        seed: int = None,
+        n_points: int = -1):
+    tgt_est_kuzmich = evaluate_kuzmich(
+        model, data_base_dir=data_base_dir, seed=seed, n_points=n_points)
+    # Drop keys:
+    k_data = list(tgt_est_kuzmich.values())
+    ret = {
+            'tgt': {p: np.array([]) for p in k_data[0]['tgt'].keys()},
+            'est': {p: np.array([]) for p in k_data[0]['est'].keys()},
+        }
+    for kd in k_data:
+        for k in ret['tgt'].keys():
+            ret['tgt'][k] = np.append(ret['tgt'][k], [kd['tgt'][k]])
+        for k in ret['est'].keys():
+            ret['est'][k] = np.append(ret['est'][k], [kd['est'][k]])
+    tgt_est['Kuzmich2017'] = ret

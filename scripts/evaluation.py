@@ -36,13 +36,14 @@ def get_available_properties(model):
 def evaluate_unified(
         model, dataset_name, n_points=None, seed=None,
         data_base_dir=default_data_base_dir, device='cpu'):
-    datasets = {
-        "qm9": testset('qm9', select_tasks=b3lyp_tasks, data_base_dir=data_base_dir),
-        "alchemy": testset('alchemy', select_tasks=b3lyp_tasks, data_base_dir=data_base_dir),
-        "oe62": testset('oe62', select_tasks=pbe0_tasks, data_base_dir=data_base_dir),
-        "hopv": testset('hopv', select_tasks=b3lyp_tasks + pbe0_tasks, data_base_dir=data_base_dir),
-    }
-    dataset = datasets[dataset_name]
+    dataset_tasks = {
+        "qm9": b3lyp_tasks,
+        "alchemy": b3lyp_tasks,
+        "oe62": pbe0_tasks,
+        "hopv": b3lyp_tasks + pbe0_tasks,
+    }[dataset_name]
+    dataset = testset(
+        dataset_name, select_tasks=dataset_tasks, data_base_dir=data_base_dir)
     batch_size = 10
     
     gen = torch.Generator()
@@ -74,5 +75,8 @@ def compute_regular_data(
         data_base_dir=default_data_base_dir, device='cpu'):
     return {
         dataset_name: evaluate_unified(
-            model, dataset_name, n_points, seed=seed, device=device, data_base_dir=data_base_dir) for dataset_name in DATASET_NAMES
+            model, dataset_name,
+            n_points, seed=seed,
+            device=device,
+            data_base_dir=data_base_dir) for dataset_name in DATASET_NAMES
     }

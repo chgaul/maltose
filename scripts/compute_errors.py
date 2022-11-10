@@ -105,3 +105,6 @@ if not os.path.exists(summary_file) or os.path.getmtime(summary_file) < os.path.
 else:
     print('Summary file {} exists up to date (will not re-compute).'.format(
         summary_file))
+    summary = pd.read_json(os.path.join(model_dir(model_name), 'deviations_summary.json'))
+
+print(summary)

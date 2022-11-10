@@ -16,3 +16,9 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
 ]
+
+[tool.hatch.build.targets.wheel]
+only-include = ["src/maltose", "scripts", "sample_data", "tests"]
+
+[tool.hatch.build.targets.wheel.sources]
+"src" = ""

@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "example_package_maltose"
+name = "maltose"
 version = "0.0.1"
 authors = [
   { name="Christopher Gaul", email="c.gaul@icamcyl.com" },

@@ -28,20 +28,21 @@ meanstensor = torch.tensor([-0.3204, 0.0050, 0.3255, -0.1812, -0.0448, 0.1365])
 stddevstensor = torch.tensor([0.0875, 0.0671, 0.0887, 0.1007, 0.0348, 0.0850])
 
 # model build
-means = {k: v for k, v in zip(properties, meanstensor)}
-stddevs = {k: v for k, v in zip(properties, stddevstensor)}
-representation = spk.SchNet(n_interactions=6)
-output_modules = [
-    spk.atomistic.Atomwise(
-        n_in=representation.n_atom_basis,
-        n_layers=2,
-        n_out=1,
-        mean=means[prop],
-        stddev=stddevs[prop],
-        aggregation_mode="sum",
-        property=prop,
-    ) for prop in properties]
-model = schnetpack.AtomisticModel(representation, output_modules)
+def build_model():
+    means = {k: v for k, v in zip(properties, meanstensor)}
+    stddevs = {k: v for k, v in zip(properties, stddevstensor)}
+    representation = spk.SchNet(n_interactions=6)
+    output_modules = [
+        spk.atomistic.Atomwise(
+            n_in=representation.n_atom_basis,
+            n_layers=2,
+            n_out=1,
+            mean=means[prop],
+            stddev=stddevs[prop],
+            aggregation_mode="sum",
+            property=prop,
+        ) for prop in properties]
+    return schnetpack.AtomisticModel(representation, output_modules)
 
 def build_optimizer(model):
     return Adam(model.parameters(), lr=1e-4)

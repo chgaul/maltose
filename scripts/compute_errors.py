@@ -2,6 +2,7 @@
 Script to evaluate the estimation errors of a given model on various test sets.
 """
 import os.path
+from pathlib import Path
 import argparse
 import numpy as np
 import pandas as pd
@@ -10,15 +11,19 @@ import importlib
 
 import evaluation
 
+base_dir = os.path.join(Path(__file__).parent, "..")
+
 parser = argparse.ArgumentParser()
 parser.add_argument(
     "--config", type=str, required=True,
     help="Name of the configuration to be trained, e.g., multitask_model_v01.")
 parser.add_argument(
-    "--model-base-dir", default="./models",
+    "--model-base-dir",
+    default=os.path.join(base_dir, "models"),
     help="Parent directory for the trained model.")
 parser.add_argument(
-    "--data-base-dir", default="./data",
+    "--data-base-dir",
+    default=os.path.join(base_dir, "data"),
     help="Base directory where the primary data is located.")
 parser.add_argument(
     "--device", default="cpu",

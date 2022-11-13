@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 import urllib.request
 import zipfile
 import shutil
@@ -58,6 +59,7 @@ for filename in os.listdir(in_dir):
                         out_file.write('\t'.join(vals) + '\n')
 
 # Copy the annotations table to the data folder
+base_dir = Path(__file__).parent
 shutil.copyfile(
-    os.path.join('maltose', 'primary_data', 'Kuzmich2017', 'table1.csv'),
+    os.path.join(base_dir, 'Kuzmich2017', 'table1.csv'),
     os.path.join('data', 'Kuzmich2017', 'table1.csv'))

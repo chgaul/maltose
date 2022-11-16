@@ -65,6 +65,17 @@ model_name = args.config
 data_base_dir = args.data_base_dir
 model, model_timestamp = load_model(model_name)
 
+
+# Check if the computation has been don before
+summary_file = os.path.join(model_dir(model_name), 'deviations_summary.json')
+if os.path.exists(summary_file) and os.path.getmtime(summary_file) > model_timestamp:
+    print('Summary file {} exists and is up to date (will not re-compute).'.format(
+        summary_file))
+    summary = pd.read_json(os.path.join(model_dir(model_name), 'deviations_summary.json'))
+    print(summary)
+    exit(0)
+
+
 # Compute and dump the full error distribution
 target_file = os.path.join(model_dir(model_name), 'deviations.npz')
 if not os.path.exists(target_file) or os.path.getmtime(target_file) < model_timestamp:
@@ -87,29 +98,23 @@ else:
     print('Target file {} up to date (will not re-compute).'.format(
         target_file))
 
-# Summarize the deviations (DataFrame, json)
-summary_file = os.path.join(model_dir(model_name), 'deviations_summary.json')
-if not os.path.exists(summary_file) or os.path.getmtime(summary_file) < os.path.getmtime(target_file):
-    devs = np.load(target_file)
-    summary = pd.DataFrame(columns=[
-        'test', 'property', 'mean(error)', 'std(error)', 'MAE', 'RMSE', 'size'])
-    for k, dev in devs.items():
-        test, p = k.split(':')
-        summary = pd.concat([
-            summary,
-            pd.DataFrame({
-                'test': test,
-                'property': p,
-                'mean(error)': np.mean(dev),
-                'std(error)': np.std(dev),
-                'MAE': np.mean(np.abs(dev)),
-                'RMSE': np.sqrt(np.mean(np.square(dev))),
-                'size': len(dev),
-            }, index=[0])], ignore_index=True)
-    summary.to_json(summary_file, indent=2, orient='records')
-else:
-    print('Summary file {} exists up to date (will not re-compute).'.format(
-        summary_file))
-    summary = pd.read_json(os.path.join(model_dir(model_name), 'deviations_summary.json'))
 
+# Summarize the deviations (DataFrame, json)
+devs = np.load(target_file)
+summary = pd.DataFrame(columns=[
+    'test', 'property', 'mean(error)', 'std(error)', 'MAE', 'RMSE', 'size'])
+for k, dev in devs.items():
+    test, p = k.split(':')
+    summary = pd.concat([
+        summary,
+        pd.DataFrame({
+            'test': test,
+            'property': p,
+            'mean(error)': np.mean(dev),
+            'std(error)': np.std(dev),
+            'MAE': np.mean(np.abs(dev)),
+            'RMSE': np.sqrt(np.mean(np.square(dev))),
+            'size': len(dev),
+        }, index=[0])], ignore_index=True)
+summary.to_json(summary_file, indent=2, orient='records')
 print(summary)

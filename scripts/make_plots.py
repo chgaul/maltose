@@ -48,7 +48,7 @@ parser.add_argument(
     help="Call matplotlib.pyplot.show() on the plots (for interactive revisions)")
 args = parser.parse_args()
 
-device = torch.device('cpu')
+device = args.device
 data_base_dir = args.data_base_dir
 model_base_dir = args.model_base_dir
 device = args.device
@@ -65,7 +65,7 @@ def load_model(model_name):
         config = importlib.import_module(module_name)
         model = config.build_model()
         print('Loading', state_path)
-        model.load_state_dict(torch.load(state_path))
+        model.load_state_dict(torch.load(state_path, map_location=device))
         model.eval()
         model.to(device)
     else:

@@ -68,7 +68,7 @@ model, model_timestamp = load_model(model_name)
 
 # Check if the computation has been don before
 summary_file = os.path.join(model_dir(model_name), 'deviations_summary.json')
-if os.path.exists(summary_file) and os.path.getmtime(summary_file) > model_timestamp:
+if os.path.exists(summary_file) and not os.path.getmtime(summary_file) < model_timestamp:
     print('Summary file {} exists and is up to date (will not re-compute).'.format(
         summary_file))
     summary = pd.read_json(os.path.join(model_dir(model_name), 'deviations_summary.json'))

@@ -18,7 +18,7 @@ classifiers = [
 ]
 
 [tool.hatch.build.targets.wheel]
-only-include = ["src/maltose", "scripts", "sample_data", "tests"]
+only-include = ["src/maltose"]
 
 [tool.hatch.build.targets.wheel.sources]
 "src" = ""

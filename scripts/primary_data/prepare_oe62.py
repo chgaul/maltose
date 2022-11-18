@@ -9,7 +9,7 @@ import subprocess
 import pandas as pd
 import json
 from schnetpack import AtomsData
-from maltose.primary_data.OE62.helpers import get_level, xyz2ase
+from oe62_helpers import get_level, xyz2ase
 
 
 download_dir = os.path.join('scratch', 'OE62')

@@ -1,5 +1,13 @@
 '''
 Helper functions to work with the 62k-dataset of molecular orbital energies
+
+Downloaded from: https://dataserv.ub.tum.de/index.php/s/m1507656
+Supporting material of Stuke et al. "Atomic structures and orbital energies of
+61,489 crystal-forming organic molecules", Scientific Data (2020),
+DOI: 10.1038/s41597-020-0385-y.
+
+Copyright by the authors License: http://creativecommons.org/licenses/by-sa/4.0
+Slight adaptations by Christopher Gaul, in accordance with the license.
 '''
 
 # These packages are needed for xyz2ase

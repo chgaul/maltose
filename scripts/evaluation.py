@@ -28,7 +28,7 @@ def testset(
 
 def get_available_properties(model):
     try: # for Set2Set output module
-         return [p for om in model.output_modules for p in om.properties]
+        return [p for om in model.output_modules for p in om.properties]
     except: # for Atomwise output module
         return [om.property for om in model.output_modules]
 

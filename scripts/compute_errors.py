@@ -66,7 +66,7 @@ data_base_dir = args.data_base_dir
 model, model_timestamp = load_model(model_name)
 
 
-# Check if the computation has been don before
+# Check if the computation has been done before
 summary_file = os.path.join(model_dir(model_name), 'deviations_summary.json')
 if os.path.exists(summary_file) and not os.path.getmtime(summary_file) < model_timestamp:
     print('Summary file {} exists and is up to date (will not re-compute).'.format(

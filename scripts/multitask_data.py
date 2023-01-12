@@ -4,19 +4,41 @@ import schnetpack as spk
 from schnetpack.data.atoms import AtomsData, ConcatAtomsData
 from maltose.atoms import MultitaskAtomsData
 
+hartree = 27.2114 # eV
+
 TARGET_MAPPINGS = {
-    'qm9': [
-        ('HOMO-B3LYP', 'homo'), ('LUMO-B3LYP', 'lumo'), ('Gap-B3LYP', 'gap'),
-        ('HOMO-PBE0', None), ('LUMO-PBE0', None), ('Gap-PBE0', None)],
-    'alchemy': [
-        ('HOMO-B3LYP', 'homo'), ('LUMO-B3LYP', 'lumo'), ('Gap-B3LYP', 'gap'),
-        ('HOMO-PBE0', None), ('LUMO-PBE0', None), ('Gap-PBE0', None)],
-    'oe62': [
-        ('HOMO-B3LYP', None), ('LUMO-B3LYP', None), ('Gap-B3LYP', None),
-        ('HOMO-PBE0', 'homo PBE0_vacuum'), ('LUMO-PBE0', 'lumo PBE0_vacuum'), ('Gap-PBE0', 'gap PBE0_vacuum')],
-    'hopv': [
-        ('HOMO-B3LYP', 'HOMO B3LYP/def2-SVP'), ('LUMO-B3LYP', 'LUMO B3LYP/def2-SVP'), ('Gap-B3LYP', 'Gap B3LYP/def2-SVP'),
-        ('HOMO-PBE0', 'HOMO PBE0/def2-SVP'), ('LUMO-PBE0', 'LUMO PBE0/def2-SVP'), ('Gap-PBE0', 'Gap PBE0/def2-SVP')]
+    'qm9': {
+        'HOMO-B3LYP': 'homo',
+        'LUMO-B3LYP': 'lumo',
+        'Gap-B3LYP': 'gap',
+        'HOMO-PBE0': None,
+        'LUMO-PBE0': None,
+        'Gap-PBE0': None,
+    },
+    'alchemy': {
+        'HOMO-B3LYP': 'homo',
+        'LUMO-B3LYP': 'lumo',
+        'Gap-B3LYP': 'gap',
+        'HOMO-PBE0': None,
+        'LUMO-PBE0': None,
+        'Gap-PBE0': None,
+    },
+    'oe62': {
+        'HOMO-B3LYP': None,
+        'LUMO-B3LYP': None,
+        'Gap-B3LYP': None,
+        'HOMO-PBE0': 'homo PBE0_vacuum',
+        'LUMO-PBE0': 'lumo PBE0_vacuum',
+        'Gap-PBE0': 'gap PBE0_vacuum',
+    },
+    'hopv': {
+        'HOMO-B3LYP': 'HOMO B3LYP/def2-SVP',
+        'LUMO-B3LYP': 'LUMO B3LYP/def2-SVP',
+        'Gap-B3LYP': 'Gap B3LYP/def2-SVP',
+        'HOMO-PBE0': 'HOMO PBE0/def2-SVP',
+        'LUMO-PBE0': 'LUMO PBE0/def2-SVP',
+        'Gap-PBE0': 'Gap PBE0/def2-SVP',
+    },
 }
 
 DATASET_NAMES = list(TARGET_MAPPINGS.keys())
@@ -32,7 +54,7 @@ def split_dataset(data_base_dir, dataset_name, select_tasks=None):
 
     mapping = TARGET_MAPPINGS[dataset_name]
     if select_tasks is not None:
-        mapping = [(a, b) for a, b in mapping if a in select_tasks]
+        mapping = {a: b for a, b in mapping.items() if a in select_tasks}
 
     split_file = os.path.join(data_base_dir, dataset_name, 'split_v2.npz')
     if not os.path.exists(split_file):

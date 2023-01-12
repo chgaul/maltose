@@ -11,18 +11,29 @@ class MultitaskAtomsData(AtomsData):
     def __init__(
             self,
             atomsdata: Union[AtomsData, AtomsDataSubset, ConcatAtomsData],
-            tasksmapping: List[Tuple[str, Optional[str]]],
+            tasksmapping: map,
             validity_column=True):
+        """
+        :param tasksmapping: map from task names (str) to either
+            - a source name (str), or
+            - a tuple of source name and factor.
+        :param validity_column, bool: Whether to provide a validity column. If
+            all entries are valid, the validity column may be omitted.
+        """
         self.atomsdata = atomsdata
-        self._available_properties = [outer_k for outer_k, _ in tasksmapping]
-        self.tasksmap = {outer_k: inner_k for outer_k, inner_k in tasksmapping}
+        self._available_properties = set(tasksmapping.keys())
+        for v in tasksmapping.values():
+            assert v is None or isinstance(v, str) or isinstance(v, tuple)
+        self.tasksmap = {
+            k: (v, 1.0) if isinstance(v, str) else v for k, v in tasksmapping.items()
+        }
         self._load_only = None
         self.validity_column = validity_column
         for inner_k in self.tasksmap.values():
             if inner_k is None:
                 assert self.validity_column
             else:
-                assert inner_k in self.atomsdata.available_properties
+                assert inner_k[0] in self.atomsdata.available_properties
         
     def get_properties(self, idx, load_only=None):
         
@@ -43,16 +54,18 @@ class MultitaskAtomsData(AtomsData):
         
         # Add the "outer" properties
         for k in requested_props:
-            inner_k = self.tasksmap[k]
-            if self.validity_column:
-                if inner_k is not None:
-                    valid = np.array([1.0])
-                    outer_props[k] = np.stack([valid, inner_props[inner_k]])
-                else:
-                    invalid, dummy = 0.0, -1.0
-                    outer_props[k] = np.array([[invalid], [dummy]])
+            mapto = self.tasksmap[k]
+            if mapto is None: # This implies that ther is a validity column
+                invalid, dummy = 0.0, -1.0
+                outer_props[k] = np.array([[invalid], [dummy]])
             else:
-                outer_props[k] = inner_props[inner_k]
+                inner_k, factor = mapto
+                value = inner_props[inner_k] * factor
+                if self.validity_column:
+                    valid = np.array([1.0])
+                    outer_props[k] = np.stack([valid, value])
+                else:
+                    outer_props[k] = value
 
         return at, outer_props
 

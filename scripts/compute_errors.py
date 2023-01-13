@@ -79,48 +79,75 @@ if os.path.exists(summary_file) and not os.path.getmtime(summary_file) < model_t
 
 
 # Compute and dump the full error distribution
-target_file = os.path.join(model_dir(model_name), 'deviations.npz')
-if not os.path.exists(target_file) or os.path.getmtime(target_file) < model_timestamp:
-    est_properties = evaluation.get_available_properties(model=model)
-    tgt_est = {
-        dataset_name: evaluation.evaluate_unified(
-            model, dataset_name,
+est_properties = evaluation.get_available_properties(model=model)
+
+def compute_deviations_general(test):
+    target_file = os.path.join(model_dir(model_name), test + '_deviations.npz')
+    if not os.path.exists(target_file) or os.path.getmtime(target_file) < model_timestamp:
+        data = evaluation.evaluate_unified(
+            model, test,
             n_points=None, seed=None,
             device=args.device,
-            data_base_dir=data_base_dir) for dataset_name in DATASET_NAMES
-    }
-    tgt_est['Kuzmich2017'] = evaluation.evaluate_kuzmich(
-        model, data_base_dir, n_points=-1, seed=RANDOMSEED,
-        device=args.device)
-    devs = {}
-    for test, data in tgt_est.items():
+            data_base_dir=data_base_dir)
+        devs = {}
         print(test)
         for p in data['tgt'].keys():
             if p in data['est']:
                 print('  ', p)
-                devs[test + ':' + p] = data['est'][p] - data['tgt'][p]
-    np.savez(target_file, **devs)
-else:
-    print('Target file {} up to date (will not re-compute).'.format(
-        target_file))
+                devs[p] = data['est'][p] - data['tgt'][p]
+        np.savez(target_file, **devs)
+        return devs
+    else:
+        print('Target file {} up to date (will not re-compute).'.format(
+            target_file))
+    return np.load(target_file)
 
 
-# Summarize the deviations (DataFrame, json)
-devs = np.load(target_file)
+# Special treatment of Kuzmich2017, which is not in the form of an ase db:
+def compute_deviations_kuzmich():
+    test = 'Kuzmich2017'
+    target_file = os.path.join(model_dir(model_name), test + '_deviations.npz')
+    if not os.path.exists(target_file) or os.path.getmtime(target_file) < model_timestamp:
+        data = evaluation.evaluate_kuzmich(
+            model, data_base_dir, n_points=-1, seed=RANDOMSEED,
+            device=args.device)
+        devs = {}
+        print(test)
+        for p in data['tgt'].keys():
+            if p in data['est']:
+                print('  ', p)
+                devs[p] = data['est'][p] - data['tgt'][p]
+        np.savez(target_file, **devs)
+        return devs
+    else:
+        print('Target file {} up to date (will not re-compute).'.format(
+            target_file))
+        return np.load(target_file)
+
+def compute_deviations(test):
+    if test=='Kuzmich2017':
+        return compute_deviations_kuzmich()
+    else:
+        return compute_deviations_general(test)
+
+
+# Compute and summarize the deviations (DataFrame, json)
 summary = pd.DataFrame(columns=[
     'test', 'property', 'mean(error)', 'std(error)', 'MAE', 'RMSE', 'size'])
-for k, dev in devs.items():
-    test, p = k.split(':')
-    summary = pd.concat([
-        summary,
-        pd.DataFrame({
-            'test': test,
-            'property': p,
-            'mean(error)': np.mean(dev),
-            'std(error)': np.std(dev),
-            'MAE': np.mean(np.abs(dev)),
-            'RMSE': np.sqrt(np.mean(np.square(dev))),
-            'size': len(dev),
-        }, index=[0])], ignore_index=True)
+
+for test in DATASET_NAMES + ['Kuzmich2017']:
+    devs = compute_deviations(test)
+    for p, dev in devs.items():
+        summary = pd.concat([
+            summary,
+            pd.DataFrame({
+                'test': test,
+                'property': p,
+                'mean(error)': np.mean(dev),
+                'std(error)': np.std(dev),
+                'MAE': np.mean(np.abs(dev)),
+                'RMSE': np.sqrt(np.mean(np.square(dev))),
+                'size': len(dev),
+            }, index=[0])], ignore_index=True)
 summary.to_json(summary_file, indent=2, orient='records')
 print(summary)

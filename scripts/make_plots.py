@@ -21,7 +21,6 @@ import pandas as pd
 import torch
 
 import evaluation
-from multitask_data import DATASET_NAMES
 
 base_dir = os.path.join(Path(__file__).parent, "..")
 
@@ -150,7 +149,7 @@ tgt_est = {
         model, dataset_name,
         n_points=n_points, seed=RANDOMSEED,
         device=device,
-        data_base_dir=data_base_dir) for dataset_name in DATASET_NAMES
+        data_base_dir=data_base_dir) for dataset_name in evaluation.DATASET_NAMES
 }
 tgt_est['Kuzmich2017'] = evaluation.evaluate_kuzmich(
     model, data_base_dir,

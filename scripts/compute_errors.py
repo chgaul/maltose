@@ -30,6 +30,9 @@ parser.add_argument(
 parser.add_argument(
     "--device", default="cpu",
     help="Device for running the training. For example 'cpu', 'cuda', 'cuda:2'")
+parser.add_argument(
+    "--test", required=False, nargs='*',
+    help="Names of the tests to be executed. Default is to execute all tests.")
 args = parser.parse_args()
 
 def model_dir(model_name):
@@ -61,12 +64,17 @@ def load_model(model_name):
                 model_name, mdir))
     return model, os.path.getmtime(state_path)
 
+if args.test is None:
+    TESTS = set(DATASET_NAMES + ['Kuzmich2017'])
+else:
+    TESTS = set(args.test)
 
-RANDOMSEED = 26463461 # For shuffling the items in a reproducible way
 model_name = args.config
 data_base_dir = args.data_base_dir
 model, model_timestamp = load_model(model_name)
 
+# Properties estimated by the model
+est_properties = evaluation.get_available_properties(model=model)
 
 # Check if the computation has been done before
 summary_file = os.path.join(model_dir(model_name), 'deviations_summary.json')
@@ -74,12 +82,14 @@ if os.path.exists(summary_file) and not os.path.getmtime(summary_file) < model_t
     print('Summary file {} exists and is up to date (will not re-compute).'.format(
         summary_file))
     summary = pd.read_json(os.path.join(model_dir(model_name), 'deviations_summary.json'))
-    print(summary)
-    exit(0)
+else:
+    summary = pd.DataFrame(columns=[
+        'test', 'property', 'mean(error)', 'std(error)', 'MAE', 'RMSE', 'size'])
 
+# Run all available tests except those that are already in the summary file:
+TESTS = TESTS - set(summary['test'])
 
 # Compute and dump the full error distribution
-est_properties = evaluation.get_available_properties(model=model)
 
 def compute_deviations_general(test):
     target_file = os.path.join(model_dir(model_name), test + '_deviations.npz')
@@ -109,8 +119,7 @@ def compute_deviations_kuzmich():
     target_file = os.path.join(model_dir(model_name), test + '_deviations.npz')
     if not os.path.exists(target_file) or os.path.getmtime(target_file) < model_timestamp:
         data = evaluation.evaluate_kuzmich(
-            model, data_base_dir, n_points=-1, seed=RANDOMSEED,
-            device=args.device)
+            model, data_base_dir, device=args.device)
         devs = {}
         print(test)
         for p in data['tgt'].keys():
@@ -132,10 +141,7 @@ def compute_deviations(test):
 
 
 # Compute and summarize the deviations (DataFrame, json)
-summary = pd.DataFrame(columns=[
-    'test', 'property', 'mean(error)', 'std(error)', 'MAE', 'RMSE', 'size'])
-
-for test in DATASET_NAMES + ['Kuzmich2017']:
+for test in TESTS:
     devs = compute_deviations(test)
     for p, dev in devs.items():
         summary = pd.concat([

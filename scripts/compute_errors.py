@@ -10,6 +10,8 @@ import torch
 import importlib
 
 import evaluation
+from multitask_data import DATASET_NAMES
+
 
 base_dir = os.path.join(Path(__file__).parent, "..")
 
@@ -80,11 +82,15 @@ if os.path.exists(summary_file) and not os.path.getmtime(summary_file) < model_t
 target_file = os.path.join(model_dir(model_name), 'deviations.npz')
 if not os.path.exists(target_file) or os.path.getmtime(target_file) < model_timestamp:
     est_properties = evaluation.get_available_properties(model=model)
-    tgt_est = evaluation.compute_regular_data(
-        model, data_base_dir, n_points=None, seed=RANDOMSEED,
-        device=args.device)
-    evaluation.add_kuzmich(
-        tgt_est, model, data_base_dir, n_points=-1, seed=RANDOMSEED,
+    tgt_est = {
+        dataset_name: evaluation.evaluate_unified(
+            model, dataset_name,
+            n_points=None, seed=None,
+            device=args.device,
+            data_base_dir=data_base_dir) for dataset_name in DATASET_NAMES
+    }
+    tgt_est['Kuzmich2017'] = evaluation.evaluate_kuzmich(
+        model, data_base_dir, n_points=-1, seed=RANDOMSEED,
         device=args.device)
     devs = {}
     for test, data in tgt_est.items():

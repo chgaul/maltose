@@ -8,8 +8,6 @@ import schnetpack
 from maltose.atoms import MultitaskAtomsData
 
 import multitask_data
-from multitask_data import DATASET_NAMES
-
 
 b3lyp_tasks = ['HOMO-B3LYP', 'LUMO-B3LYP', 'Gap-B3LYP']
 pbe0_tasks = ['HOMO-PBE0', 'LUMO-PBE0', 'Gap-PBE0']
@@ -69,17 +67,6 @@ def evaluate_unified(
             break
     return ret
 
-def compute_regular_data(
-        model, data_base_dir=default_data_base_dir,
-        n_points=None, seed=None, device='cpu'):
-    return {
-        dataset_name: evaluate_unified(
-            model, dataset_name,
-            n_points, seed=seed,
-            device=device,
-            data_base_dir=data_base_dir) for dataset_name in DATASET_NAMES
-    }
-
 # Functions to evaluate the Kuzmich 2017 data, which is in xyz format
 def predict_on_xyz(model, xyzfile, device='cpu'):
     mol = schnetpack.data.loader._collate_aseatoms([
@@ -92,7 +79,7 @@ def predict_on_xyz(model, xyzfile, device='cpu'):
     mol = {k: v.to(device) for k, v in mol.items()}
     return model.forward(mol)
 
-def evaluate_kuzmich(
+def _evaluate_kuzmich_core(
         model, data_base_dir, seed=None, n_points=-1, device='cpu'):
     kuzmich_dir = os.path.join(data_base_dir, 'Kuzmich2017')
     df = pd.read_csv(os.path.join(kuzmich_dir, 'table1.csv'))
@@ -137,16 +124,14 @@ def evaluate_kuzmich(
         }
     return ret
 
-# Bring data into the regular format and add it to the
-# target-estimates collection:
-def add_kuzmich(
-        tgt_est: dict,
+# Return Kuzmich data int the regular format
+def evaluate_kuzmich(
         model,
         data_base_dir: str,
         seed: int = None,
         n_points: int = -1,
         device='cpu'):
-    tgt_est_kuzmich = evaluate_kuzmich(
+    tgt_est_kuzmich = _evaluate_kuzmich_core(
         model, data_base_dir=data_base_dir, seed=seed, n_points=n_points,
         device=device)
     # Drop keys:
@@ -160,4 +145,4 @@ def add_kuzmich(
             ret['tgt'][k] = np.append(ret['tgt'][k], [kd['tgt'][k]])
         for k in ret['est'].keys():
             ret['est'][k] = np.append(ret['est'][k], [kd['est'][k]])
-    tgt_est['Kuzmich2017'] = ret
+    return ret

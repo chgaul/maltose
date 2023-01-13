@@ -21,6 +21,7 @@ import pandas as pd
 import torch
 
 import evaluation
+from multitask_data import DATASET_NAMES
 
 base_dir = os.path.join(Path(__file__).parent, "..")
 
@@ -144,13 +145,14 @@ else:
 n_points = 25
 RANDOMSEED = 26463461 # For shuffling the items in a reproducible way
 est_properties = evaluation.get_available_properties(model=model)
-tgt_est = evaluation.compute_regular_data(
-    model,
-    data_base_dir=data_base_dir,
-    n_points=n_points, seed=RANDOMSEED,
-    device=device)
-evaluation.add_kuzmich(
-    tgt_est,
+tgt_est = {
+    dataset_name: evaluation.evaluate_unified(
+        model, dataset_name,
+        n_points=n_points, seed=RANDOMSEED,
+        device=device,
+        data_base_dir=data_base_dir) for dataset_name in DATASET_NAMES
+}
+tgt_est['Kuzmich2017'] = evaluation.evaluate_kuzmich(
     model, data_base_dir,
     seed=RANDOMSEED, n_points=n_points, device=device)
 

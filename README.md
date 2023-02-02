@@ -109,7 +109,7 @@ All experiments are executed via python scripts in the ./scripts folder. These s
 - models/ is the diectory for saving trained models. Also some derived data, like accuracy measures of the model on the test sets, are saved here.
 - figures/ folder is written to by skripts/make_plots.py.
 
-Remark on file locations: Some scripts accept command-line parameters to specify these folder locations. If all scripts are called from the same parent directory of the scripts folder, then the default locations should be fine.
+Remark on file locations: Some scripts accept command-line parameters to specify these folder locations.
 
 ### To prepare the training data, execute:
 
@@ -149,3 +149,5 @@ and:
 ```
 python3 scripts/make_plots.py --config <conig_name> --device <device>
 ```
+
+There are also some trained models available in the ./trained-models folder. To eveluate these, add the option ```--model-base-dir ./trained-models``` to the above calls.

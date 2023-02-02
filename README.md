@@ -51,7 +51,7 @@ python3 -m build
 Install the maltose package:
 
 ```
-pip install dist/maltose-1.0.1-py3-none-any.whl
+pip install dist/maltose-1.0.2-py3-none-any.whl
 ```
 
 You're ready to go!
@@ -83,7 +83,7 @@ python3 -m build
 Install the maltose wheel via pip:
 
 ```
-pip install --no-dependencies dist/maltose-1.0.1-py3-none-any.whl
+pip install --no-dependencies dist/maltose-1.0.2-py3-none-any.whl
 ```
 
 You're ready to go!
